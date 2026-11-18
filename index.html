@@ -1,0 +1,1796 @@
+<!doctype html>
+<html lang="en" translate="yes">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="The Village — an interactive 3D market world with ten coffee vans, woodland friends and a village soundtrack.">
+  <meta name="theme-color" content="#17212b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <title>The Village · Market World</title>
+
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      /* --app-h uses the dynamic viewport height where supported so overlays
+         never slide underneath the collapsing iOS/Android browser toolbar.
+         The 100vh line above it is the fallback for older browsers. */
+      --app-h: 100vh;
+      --app-h: 100dvh;
+      --safe-t: env(safe-area-inset-top, 0px);
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --safe-l: env(safe-area-inset-left, 0px);
+      --safe-r: env(safe-area-inset-right, 0px);
+      --tap: 44px;   /* minimum comfortable touch target */
+      --pad: 12px;   /* screen edge gutter */
+    }
+    html, body { width:100%; height:100%; margin:0; overflow:hidden; color:#f7eee0;
+      background:#17212b; font-family: "Segoe UI","Noto Sans SC",system-ui,sans-serif; }
+    /* Pinning the body stops mobile browsers from rubber-band scrolling or
+       re-laying-out when the URL bar hides. */
+    body { position:fixed; inset:0; height:var(--app-h); overscroll-behavior:none;
+      -webkit-tap-highlight-color:transparent; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+    canvas { display:block; touch-action:none; }
+    .vignette { position:fixed; inset:0; z-index:1; pointer-events:none;
+      background:linear-gradient(180deg,rgba(7,13,19,.16),transparent 42%,rgba(5,9,13,.30)),
+      radial-gradient(ellipse at center,transparent 38%,rgba(5,9,13,.24)); }
+    .brand { position:fixed; z-index:3; left:28px; top:24px; pointer-events:none;
+      text-shadow:0 2px 22px #000b; }
+    .brand h1 { margin:0; font-family:Georgia,serif; font-size:clamp(23px,3vw,38px);
+      font-weight:500; letter-spacing:.09em; }
+    .brand p { margin:7px 0 0; color:#ead9c2; font-size:10px; letter-spacing:.22em; text-transform:uppercase; }
+    .brand-mark { display:inline-block; color:#e3b879; margin-right:8px; }
+    .panel { position:fixed; z-index:14; width:min(340px,calc(100vw - 28px)); padding:18px;
+      overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+      border:1px solid rgba(239,218,187,.26); border-radius:19px;
+      background:linear-gradient(145deg,rgba(49,35,29,.92),rgba(24,34,43,.90));
+      backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+      box-shadow:0 18px 55px #0006, inset 0 1px rgba(255,255,255,.08); }
+    .panel-head { display:flex; align-items:center; justify-content:space-between; gap:10px;
+      margin:-2px 0 12px; }
+    .panel-head-title { color:#e4bd87; font-size:10px; letter-spacing:.2em; text-transform:uppercase; }
+    .icon-btn { display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+      width:var(--tap); height:var(--tap); min-height:var(--tap); padding:0;
+      border:1px solid rgba(239,218,187,.3); border-radius:999px; color:#f4e2c6;
+      background:rgba(255,255,255,.08); font-size:24px; line-height:1; cursor:pointer; }
+    .panel-title { margin:0 0 10px; color:#e4bd87; font-size:10px; letter-spacing:.2em; text-transform:uppercase; }
+    .section { padding-bottom:12px; margin-bottom:13px; border-bottom:1px solid rgba(255,255,255,.10); }
+    .row { display:flex; min-height:35px; align-items:center; justify-content:space-between; gap:10px;
+      color:#eee5d8; font-size:12px; }
+    select, button { color:#f7eee0; border:1px solid rgba(255,255,255,.2); border-radius:10px;
+      background:rgba(255,255,255,.08); font:inherit; }
+    select { width:145px; padding:8px 9px; outline:none; }
+    select option { color:#18232b; }
+    /* Custom slider chrome: a 6px track with a 26px thumb gives a real
+       fingertip-sized grab area instead of the hairline browser default.
+       touch-action:pan-y lets a vertical drag still scroll the panel. */
+    input[type="range"] { width:145px; height:26px; margin:0; accent-color:#dfb77d;
+      background:transparent; -webkit-appearance:none; appearance:none; cursor:pointer;
+      touch-action:pan-y; }
+    input[type="range"]::-webkit-slider-runnable-track { height:6px; border-radius:999px;
+      background:rgba(255,255,255,.22); }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
+      width:26px; height:26px; margin-top:-10px; border-radius:50%;
+      background:linear-gradient(135deg,#f0cd95,#cf9c58);
+      border:1px solid rgba(255,255,255,.55); box-shadow:0 2px 8px #0008; }
+    input[type="range"]::-moz-range-track { height:6px; border-radius:999px;
+      background:rgba(255,255,255,.22); }
+    input[type="range"]::-moz-range-thumb { width:24px; height:24px; border:1px solid rgba(255,255,255,.55);
+      border-radius:50%; background:linear-gradient(135deg,#f0cd95,#cf9c58); box-shadow:0 2px 8px #0008; }
+    input[type="checkbox"] { width:22px; height:22px; accent-color:#d6ad72; cursor:pointer; }
+    button { min-height:40px; padding:8px 13px; cursor:pointer; transition:background .2s ease,border-color .2s ease; touch-action:manipulation; }
+    button:focus-visible, select:focus-visible, input:focus-visible { outline:2px solid #e4bd87; outline-offset:3px; }
+    .settings-toggle { position:fixed; z-index:12; top:22px; right:22px; display:flex; align-items:center; gap:9px;
+      width:48px; height:48px; min-height:48px; padding:0; justify-content:center; border:1px solid rgba(220,190,145,.72); border-radius:999px;
+      color:#f8e7c9; background:linear-gradient(135deg,rgba(74,39,35,.97),rgba(28,43,48,.97));
+      box-shadow:0 8px 28px #0007, inset 0 1px rgba(255,255,255,.12); letter-spacing:.14em; font-size:10px; }
+    .settings-toggle .gear { font-size:22px; line-height:1; color:#e9bd7c; }
+    .panel { display:none; top:82px; right:22px; max-height:calc(var(--app-h) - 104px); }
+    .panel.open { display:block; animation:panelIn .22s ease-out; }
+    @keyframes panelIn { from { opacity:0; transform:translateY(-8px) scale(.98); } to { opacity:1; transform:none; } }
+    .atmosphere { border:0; padding:0; margin:0 0 13px; }
+    .atmosphere summary { list-style:none; display:flex; align-items:center; justify-content:space-between; gap:10px;
+      min-height:48px; padding:8px 11px; border:1px solid rgba(239,218,187,.22); border-radius:12px;
+      background:rgba(223,183,125,.08); color:#f2dfc4; cursor:pointer; font-size:12px; touch-action:manipulation; }
+    .atmosphere summary::-webkit-details-marker { display:none; }
+    .atmosphere summary::after { content:'＋'; color:#e4bd87; font-size:18px; }
+    .atmosphere[open] summary::after { content:'－'; }
+    .atmosphere-content { padding:12px 2px 0; }
+    .atmosphere .panel-title { margin-bottom:8px; }
+    button:hover { background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.42); transform:translateY(-1px); }
+    .music-controls { display:grid; grid-template-columns:36px 1fr 36px; align-items:center; gap:8px; }
+    #trackName { overflow:hidden; color:#e9e1d4; font-size:11px; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
+    .selected-card { border:1px solid rgba(226,190,139,.28); border-radius:12px; padding:10px 11px;
+      background:rgba(223,183,125,.08); margin-top:7px; }
+    #selectedLabel { color:#f4e5d0; font-family:Georgia,serif; font-size:15px; }
+    #selectedHint { margin-top:4px; color:#c8b8a4; font-size:10px; line-height:1.5; }
+    .help { position:fixed; z-index:3; left:28px; bottom:88px; max-width:360px; color:rgba(250,240,225,.86);
+      font-size:11px; line-height:1.85; text-shadow:0 1px 9px #000; pointer-events:none; }
+    .help strong { color:#f1c98f; font-weight:600; }
+    .hover-card { position:fixed; z-index:18; display:none; min-width:190px; max-width:245px; padding:12px 14px;
+      color:#f7eee0; border:1px solid rgba(239,207,161,.42); border-radius:14px;
+      background:rgba(31,29,25,.91); backdrop-filter:blur(14px); box-shadow:0 12px 35px #0008;
+      pointer-events:none; transform:translate(14px,14px); }
+    .hover-card .eyebrow { color:#d8ae77; font-size:9px; letter-spacing:.18em; text-transform:uppercase; padding-right:28px; }
+    .hover-card .shop-name { margin-top:4px; font-family:Georgia,serif; font-size:19px; }
+    .hover-card .shop-desc { margin-top:5px; color:#d6c8b6; font-size:10px; line-height:1.5; }
+    .hover-card .shop-action { display:inline-block; margin-top:9px; color:#e8c28e; font-size:10px; letter-spacing:.10em;
+      text-decoration:none; border:1px solid rgba(232,194,142,.45); border-radius:999px; padding:8px 11px; }
+    .hover-card .shop-action:hover { background:rgba(232,194,142,.14); }
+    /* The dismiss button only exists on touch, where the card is a tappable
+       sheet rather than a cursor-following tooltip. */
+    .hover-card .card-close { display:none; }
+    .hover-logo { display:none; width:54px; height:54px; object-fit:contain; border-radius:9px; background:#fff;
+      padding:4px; margin-top:8px; }
+    /* JS adds .docked whenever the interaction really came from a finger.
+       Driving this from JS rather than a media query means hybrid laptops
+       (which report pointer:fine but still send touch events) dock the sheet
+       correctly too. The card becomes a tappable bottom sheet with working
+       buttons instead of an inert cursor-following tooltip. */
+    .hover-card.docked { left:calc(var(--pad) + var(--safe-l)) !important;
+      right:calc(var(--pad) + var(--safe-r)); top:auto !important;
+      bottom:calc(118px + var(--safe-b)); width:auto; max-width:none;
+      transform:none; padding:14px 16px; pointer-events:auto; }
+    .hover-card.docked .shop-name { font-size:19px; }
+    .hover-card.docked .shop-desc { font-size:12px; line-height:1.55; }
+    .hover-card.docked .shop-action { display:flex; align-items:center; justify-content:center;
+      min-height:var(--tap); font-size:14px; letter-spacing:.08em; }
+    .hover-card.docked .card-close { display:flex; position:absolute; top:7px; right:7px;
+      width:34px; height:34px; min-height:34px; padding:0; align-items:center;
+      justify-content:center; border-radius:999px; font-size:20px; line-height:1; }
+    .hover-card.docked .hover-logo { width:52px; height:52px; }
+    .toast { position:fixed; z-index:30; left:50%; bottom:24px; transform:translateX(-50%);
+      max-width:min(340px,calc(100vw - 24px)); padding:9px 14px; border:1px solid #e0bd8c55; border-radius:30px;
+      background:#211e1bdc; color:#f5e5cf; font-size:11px; line-height:1.5; text-align:center;
+      opacity:0; transition:opacity .25s; pointer-events:none; }
+    .toast.show { opacity:1; }
+
+    .explore-toggle { position:fixed; z-index:11; left:22px; bottom:22px; border:1px solid rgba(232,194,142,.65);
+      border-radius:999px; color:#f8e7c9; background:rgba(35,31,27,.88); font-size:11px; letter-spacing:.12em; box-shadow:0 8px 24px #0007; }
+    /* Home button — sits top-right beside the settings gear */
+    .home-btn { position:fixed; z-index:11; top:22px; left:auto; right:68px; width:44px; height:44px; min-height:44px;
+      border:1px solid rgba(232,194,142,.65); border-radius:999px; color:#f8e7c9; background:rgba(35,31,27,.88);
+      font-size:20px; line-height:1; box-shadow:0 8px 24px #0007; cursor:pointer; }
+    .home-btn:hover { background:rgba(232,194,142,.2); }
+    .explore-list { display:none; position:fixed; z-index:16; left:22px; bottom:76px; width:min(320px,calc(100vw - 28px));
+      max-height:min(65vh,540px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+      padding:14px; border:1px solid rgba(239,218,187,.3); border-radius:16px;
+      background:rgba(31,29,25,.96); box-shadow:0 18px 45px #0009; backdrop-filter:blur(16px); }
+    .explore-list.open { display:block; animation:panelIn .22s ease-out; }
+    .explore-heading { display:flex; justify-content:space-between; align-items:center; gap:10px;
+      color:#e8bd7c; font-size:11px; letter-spacing:.16em; margin-bottom:10px; }
+    .explore-heading button { width:var(--tap); height:var(--tap); min-width:var(--tap); min-height:var(--tap);
+      padding:0; font-size:24px; line-height:1; }
+    .explore-items { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .explore-items button { min-height:44px; text-align:left; font-size:12px; overflow-wrap:anywhere; }
+    .explore-items button span { color:#e8bd7c; font-weight:700; margin-right:7px; }
+    .walk-pad { position:fixed; z-index:11; right:18px; bottom:18px; display:flex; flex-direction:column;
+      align-items:center; gap:6px; opacity:.92; touch-action:none; user-select:none; -webkit-user-select:none; }
+    .walk-pad div { display:flex; gap:6px; }
+    .walk-pad button { width:46px; height:46px; min-height:46px; padding:0; border-radius:13px;
+      background:rgba(31,29,25,.72); border-color:rgba(239,218,187,.35); color:#f8e7c9; font-size:17px;
+      touch-action:none; transition:background .12s ease,transform .12s ease; }
+    /* .is-pressed is driven by JS because :active is unreliable once the
+       pointer is captured or slides between buttons. */
+    .walk-pad button:active, .walk-pad button.is-pressed { background:rgba(205,151,88,.8);
+      border-color:#f0cd95; transform:scale(.94); }
+    /* ------------------------------------------------------------------
+       TOUCH DEVICES — matched by input capability rather than screen
+       width, so a phone held in landscape still gets the mobile UI.
+       ------------------------------------------------------------------ */
+    @media (hover:none), (pointer:coarse) {
+      .brand { top:calc(var(--pad) + var(--safe-t)); left:calc(var(--pad) + var(--safe-l)); }
+      .brand h1 { font-size:clamp(17px,4.8vw,22px); }
+      .brand p { font-size:8px; letter-spacing:.14em; }
+      .help { display:none; }
+
+      .settings-toggle { top:calc(10px + var(--safe-t)); right:calc(10px + var(--safe-r));
+        width:var(--tap); height:var(--tap); min-height:var(--tap); padding:0; }
+      .home-btn { top:calc(10px + var(--safe-t)); right:calc(58px + var(--safe-r)); width:var(--tap); height:var(--tap); min-height:var(--tap); }
+
+      /* 16px is the floor below which iOS Safari force-zooms the page on focus. */
+      .row { min-height:46px; gap:8px; font-size:15px; }
+      select { width:min(170px,56%); min-height:44px; font-size:16px; padding:10px 9px; }
+      input[type="range"] { width:min(170px,54%); height:30px; }
+      input[type="checkbox"] { width:26px; height:26px; }
+      button { min-height:46px; padding:10px 14px; font-size:16px; }
+      /* :hover sticks after a tap on touchscreens, so neutralise it. */
+      button:hover { transform:none; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2); }
+      button:active { background:rgba(255,255,255,.2); }
+
+      .panel { top:calc(66px + var(--safe-t)); right:calc(10px + var(--safe-r)); bottom:auto;
+        width:min(340px,calc(100vw - 20px)); padding:14px; border-radius:16px;
+        max-height:calc(var(--app-h) - 88px - var(--safe-t) - var(--safe-b)); }
+      .panel .section { padding-bottom:10px; margin-bottom:10px; }
+      .music-controls { grid-template-columns:48px 1fr 48px; gap:8px; }
+      #trackName { font-size:13px; }
+
+      /* Detail-card docking is handled by .hover-card.docked (JS driven) so
+         that hybrid touch laptops behave like phones. Only the smaller logo
+         needs a width-based tweak here. */
+      .hover-logo { width:52px; height:52px; }
+
+      .explore-toggle { left:calc(10px + var(--safe-l)); bottom:calc(12px + var(--safe-b));
+        min-height:46px; padding:10px 14px; font-size:12px; }
+      .explore-list { left:calc(10px + var(--safe-l)); right:auto; bottom:calc(70px + var(--safe-b));
+        width:min(320px,calc(100vw - 20px)); max-height:min(52vh,460px); padding:12px; }
+      .explore-items { grid-template-columns:1fr; gap:6px; }
+      .explore-items button { min-height:46px; font-size:15px; }
+
+      .walk-pad { right:calc(10px + var(--safe-r)); bottom:calc(10px + var(--safe-b)); }
+
+      /* Lifted clear of both bottom-corner controls so it is never occluded. */
+      .toast { bottom:calc(112px + var(--safe-b)); font-size:13px;
+        max-width:min(320px,calc(100vw - 24px)); }
+    }
+    /* Narrow phones — shrink the thumb controls so the two bottom corners
+       never collide with each other. */
+    @media (max-width:480px) {
+      .brand h1 { font-size:18px; letter-spacing:.05em; }
+    }
+    @media (max-width:380px) {
+      .walk-pad button { width:42px; height:42px; min-height:42px; }
+      .brand h1 { font-size:19px; letter-spacing:.05em; }
+      .explore-toggle { font-size:11px; padding:10px 12px; }
+    }
+
+    /* Landscape phones: wide but very short. */
+    @media (orientation:landscape) and (max-height:520px) {
+      .brand h1 { font-size:19px; }
+      .brand p { display:none; }
+      .panel { top:calc(60px + var(--safe-t));
+        max-height:calc(var(--app-h) - 76px - var(--safe-t) - var(--safe-b)); }
+      .hover-card.docked { bottom:calc(104px + var(--safe-b)); }
+      .explore-list { bottom:calc(66px + var(--safe-b)); max-height:min(60vh,300px); }
+      .explore-items { grid-template-columns:1fr 1fr; }
+      .walk-pad button { width:42px; height:42px; min-height:42px; }
+      .toast { bottom:calc(96px + var(--safe-b)); }
+    }
+
+    /* Branded loading veil. three.js is pulled from a CDN and the scene is
+       built synchronously, so on a mobile connection the first paint can be
+       several seconds away — this covers that gap and reports failures. */
+    .loader { position:fixed; inset:0; z-index:40; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:14px; padding:24px; text-align:center;
+      background:radial-gradient(ellipse at center,#243444,#131d27 70%); transition:opacity .5s ease; }
+    .loader.hidden { opacity:0; pointer-events:none; display:none !important; }
+    .loader-mark { color:#e3b879; font-size:26px; animation:loaderPulse 1.6s ease-in-out infinite; }
+    .loader-title { font-family:Georgia,serif; font-size:clamp(20px,5vw,28px); letter-spacing:.09em; color:#f7eee0; }
+    .loader-status { color:#c8b8a4; font-size:11px; letter-spacing:.16em; text-transform:uppercase; }
+    .loader-bar { width:min(220px,60vw); height:3px; border-radius:999px;
+      background:rgba(255,255,255,.16); overflow:hidden; }
+    .loader-bar i { display:block; width:40%; height:100%; border-radius:999px;
+      background:linear-gradient(90deg,#e3b879,#f4dcb4); animation:loaderSlide 1.1s ease-in-out infinite; }
+    .loader-error { display:none; max-width:340px; color:#f0d3c0; font-size:13px; line-height:1.6; }
+    .loader.error .loader-mark, .loader.error .loader-bar { display:none; }
+    .loader.error .loader-error { display:block; }
+    @keyframes loaderPulse { 0%,100% { opacity:.45; transform:scale(.94); } 50% { opacity:1; transform:scale(1); } }
+    @keyframes loaderSlide { 0% { transform:translateX(-100%); } 100% { transform:translateX(320%); } }
+
+    @media (prefers-reduced-motion:reduce) {
+      .loader-mark, .loader-bar i { animation:none; }
+      .panel.open, .explore-list.open { animation:none; }
+      button { transition:none; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Stays up until the first frame has actually rendered, and doubles as
+       the failure screen if WebGL or the three.js CDN import is unavailable. -->
+  <div class="loader" id="loader" role="status" aria-live="polite">
+    <div class="loader-mark" aria-hidden="true">✦</div>
+    <div class="loader-title">The Village</div>
+    <div class="loader-bar" aria-hidden="true"><i></i></div>
+    <div class="loader-status" id="loaderStatus">Warming up the village…</div>
+    <p class="loader-error" id="loaderError">
+      This village needs WebGL and could not start. Try another browser, or check
+      your connection — the 3D engine is loaded from a CDN.
+    </p>
+  </div>
+  <noscript>
+    <div class="loader error">
+      <div class="loader-title">The Village</div>
+      <p class="loader-error">This interactive 3D village needs JavaScript enabled.</p>
+    </div>
+  </noscript>
+
+  <!-- Safety net: hides the loading veil after 5 seconds even if the 3D engine
+       fails to load (e.g. offline, CDN blocked, or opened as file://). -->
+  <script>
+    setTimeout(function() {
+      var loader = document.getElementById('loader');
+      if (loader) {
+        loader.classList.add('hidden');
+        loader.style.visibility = 'hidden';
+      }
+    }, 5000);
+  </script>
+
+  <div class="brand">
+    <h1><span class="brand-mark">✦</span>The Village</h1>
+  </div>
+
+  <button class="settings-toggle" id="settingsToggle" type="button" aria-label="Open settings" aria-expanded="false" title="Settings" style="width:40px;height:40px;min-height:40px;">
+    <span class="gear" aria-hidden="true" style="font-size:20px;">⚙</span>
+  </button>
+  <button id="homeBtn" class="explore-toggle home-btn" type="button" aria-label="Go home" title="Home">⌂</button>
+  <section class="panel" id="settingsPanel" aria-label="Village settings">
+    <div class="panel-head">
+      <span class="panel-head-title">Village settings</span>
+      <button class="icon-btn" id="closeSettings" type="button" aria-label="Close settings">×</button>
+    </div>
+    <details class="atmosphere">
+      <summary><span>✦</span><span style="flex:1">SCENE ATMOSPHERE · 场景氛围</span><span style="color:#bda98f;font-size:10px">设置</span></summary>
+      <div class="atmosphere-content">
+        <div class="panel-title">Scene atmosphere · 场景氛围</div>
+        <div class="row"><label for="season">Season / 四季</label>
+          <select id="season">
+            <option value="spring">Spring · 春</option><option value="summer">Summer · 夏</option>
+            <option value="autumn">Autumn · 秋</option><option value="winter" selected>Winter · 冬</option>
+          </select>
+        </div>
+        <div class="row"><label for="night">Night ambience</label><input id="night" type="checkbox" checked></div>
+        <div class="row"><label for="stars">Show stars</label><input id="stars" type="checkbox" checked></div>
+        <div class="row"><label for="sunlight">Sunlight</label><input id="sunlight" type="range" min="0" max="2.5" step="0.05" value="1.1"></div>
+      </div>
+    </details>
+
+    <div class="section">
+      <div class="panel-title">Your selection · 当前选择</div>
+      <div class="selected-card">
+        <div id="selectedLabel">Explore the village</div>
+        <div id="selectedHint">Choose a stall to explore, or wander around the village.</div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span>Camera view</span>
+        <button id="resetView" type="button">↺ Reset view</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="panel-title">Village soundtrack · 音乐</div>
+      <div class="row"><label for="playlist">Playlist</label><select id="playlist"></select></div>
+      <div class="music-controls">
+        <button id="previous" aria-label="Previous track">‹</button>
+        <span id="trackName">Choose a track</span>
+        <button id="next" aria-label="Next track">›</button>
+      </div>
+      <div class="row"><label for="volume">Volume</label><input id="volume" type="range" min="0" max="1" step="0.01" value="0.35"></div>
+    </div>
+    <div class="row"><span style="color:#cdb99f;font-size:10px">10 MARKET STALLS</span></div>
+  </section>
+
+  <div class="bottom-stacks" style="position:fixed; z-index:11; left:22px; bottom:22px; display:flex; flex-direction:column; gap:10px;">
+    <button id="exploreToggle" class="explore-toggle" type="button" aria-expanded="false">CLICK TO EXPLORE</button>
+  </div>
+  <nav id="exploreList" class="explore-list" aria-label="Market stall directory">
+    <div class="explore-heading">EXPLORE THE VILLAGE <button id="closeExplore" type="button" aria-label="Close list">×</button></div>
+    <div id="exploreItems" class="explore-items"></div>
+  </nav>
+  <div class="walk-pad" aria-label="Walk controls">
+    <button type="button" data-walk="forward" aria-label="Walk forward">▲</button>
+    <div><button type="button" data-walk="left" aria-label="Walk left">◀</button><button type="button" data-walk="back" aria-label="Walk backward">▼</button><button type="button" data-walk="right" aria-label="Walk right">▶</button></div>
+  </div>
+  <div class="hover-card" id="hoverCard" role="dialog" aria-label="Stall details">
+    <button class="card-close icon-btn" id="hoverClose" type="button" aria-label="Close details">×</button>
+    <div class="eyebrow">WELCOME TO THE VILLAGE</div>
+    <div class="shop-name" id="hoverName">Market Stall</div>
+    <div class="shop-desc" id="hoverDesc">A little story from the village.</div>
+    <img class="hover-logo" id="hoverLogo" alt="Market stall logo">
+    <a class="shop-action" id="hoverLink" href="#" target="_blank" rel="noopener noreferrer">CLICK TO VISIT WEBSITE ↗</a>
+  </div>
+  <div class="toast" id="toast">Opening your destination…</div>
+  <div class="vignette"></div>
+  <audio id="audio" preload="none"></audio>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ============================================================
+    // LOGO IMAGE FILES — photo1.jpg to photo10.jpg are used as the
+    // shop logos for market vans 1–10.
+    // Put your own logo images in assets/photos/. JPG, PNG and WEBP work.
+    // ============================================================
+    const PHOTOS = [
+      'assets/photos/photo1.jpg',
+      'assets/photos/photo2.jpg',
+      'assets/photos/photo3.jpg',
+      'assets/photos/photo4.jpg',
+      'assets/photos/photo5.jpg',
+      'assets/photos/photo6.jpg',
+      'assets/photos/photo7.jpg',
+      'assets/photos/photo8.jpg',
+      'assets/photos/photo9.jpg',
+      'assets/photos/photo10.jpg'
+    ];
+    // Large HOME glass café uses its own exterior/interior photo on the HOME sign.
+    const HOME_PHOTO = 'assets/photos/home.jpg';
+
+    const PLAYLIST = [
+      { title: 'Song 1', src: 'assets/music/song1.mp3' },
+      { title: 'Song 2', src: 'assets/music/song2.mp3' },
+      { title: 'Song 3', src: 'assets/music/song3.mp3' }
+    ];
+
+    // ============================================================
+    // INPUT DETECTION — capability based rather than width based, so a
+    // phone held in landscape (where innerWidth can exceed 700) is still
+    // treated as a touch device.
+    // ============================================================
+    const coarsePointer = matchMedia('(pointer: coarse)');
+    const noHover       = matchMedia('(hover: none)');
+    let IS_TOUCH = coarsePointer.matches || noHover.matches;
+    function applyTouchCopy() {
+      const t = document.querySelector('#exploreToggle');
+      if (t) t.textContent = IS_TOUCH ? 'TAP TO EXPLORE' : 'CLICK TO EXPLORE';
+      document.body.classList.toggle('touch', IS_TOUCH);
+    }
+    function onInputCapabilityChange() { IS_TOUCH = coarsePointer.matches || noHover.matches; applyTouchCopy(); }
+    // addEventListener on MediaQueryList needs a guard for very old Safari.
+    if (coarsePointer.addEventListener) {
+      coarsePointer.addEventListener('change', onInputCapabilityChange);
+      noHover.addEventListener('change', onInputCapabilityChange);
+    }
+    applyTouchCopy();
+
+    // ============================================================
+    // OVERLAY MANAGER — only ever one sheet open, and every sheet can be
+    // dismissed by its own ✕, by tapping the scene, or with Escape.
+    // ============================================================
+    const settingsToggle = document.querySelector('#settingsToggle');
+    const settingsPanel  = document.querySelector('#settingsPanel');
+    const exploreToggle  = document.querySelector('#exploreToggle');
+    const exploreList    = document.querySelector('#exploreList');
+
+    function setSettingsOpen(open) {
+      settingsPanel.classList.toggle('open', open);
+      settingsToggle.setAttribute('aria-expanded', String(open));
+      settingsToggle.setAttribute('aria-label', open ? 'Close settings' : 'Open settings');
+      settingsToggle.querySelector('.gear').textContent = open ? '×' : '⚙';
+      if (open) setExploreOpen(false);   // mutually exclusive
+    }
+    function setExploreOpen(open) {
+      exploreList.classList.toggle('open', open);
+      exploreToggle.setAttribute('aria-expanded', String(open));
+      if (open) setSettingsOpen(false);  // mutually exclusive
+    }
+    // hideHoverCard is a hoisted function declaration further down the module.
+    function closeAllOverlays() { setSettingsOpen(false); setExploreOpen(false); hideHoverCard(); }
+
+    settingsToggle.addEventListener('click', () => setSettingsOpen(!settingsPanel.classList.contains('open')));
+    document.querySelector('#closeSettings').addEventListener('click', () => setSettingsOpen(false));
+    exploreToggle.addEventListener('click', () => setExploreOpen(!exploreList.classList.contains('open')));
+    document.querySelector('#closeExplore').addEventListener('click', () => setExploreOpen(false));
+    document.querySelector('#homeBtn').addEventListener('click', () => {
+      if (HOME_URL && HOME_URL !== '#' && HOME_URL !== 'https://example.com') {
+        window.open(HOME_URL, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.textContent='Please add your homepage link in the EASY EDIT ZONE.';
+        toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),2600);
+      }
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeAllOverlays();
+    });
+    // Tapping the scene — or anywhere outside a sheet — puts the sheets away,
+    // which is what phone users expect and the only way to reclaim the view.
+    document.addEventListener('pointerdown', event => {
+      const el = event.target instanceof Element ? event.target : null;
+      if (!el) return;
+      const inUi = el.closest('#settingsPanel,#settingsToggle,#exploreList,#exploreToggle,#hoverCard,.walk-pad,.loader');
+      if (!inUi) closeAllOverlays();
+    });
+
+    // 音乐播放器
+    const audio = document.querySelector('#audio');
+    const playlistSelect = document.querySelector('#playlist');
+    const trackName = document.querySelector('#trackName');
+    let currentTrack = 0;
+
+    PLAYLIST.forEach((track, index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.textContent = track.title;
+      playlistSelect.appendChild(option);
+    });
+
+    function loadTrack(index, autoplay = false) {
+      if (!PLAYLIST.length) return;
+      currentTrack = (index + PLAYLIST.length) % PLAYLIST.length;
+      playlistSelect.value = currentTrack;
+      audio.src = PLAYLIST[currentTrack].src;
+      trackName.textContent = PLAYLIST[currentTrack].title;
+      if (autoplay) audio.play().catch(() => {});
+    }
+
+    playlistSelect.addEventListener('change', () => {
+      loadTrack(Number(playlistSelect.value), true);
+    });
+    document.querySelector('#previous').addEventListener('click', () => {
+      loadTrack(currentTrack - 1, true);
+    });
+    document.querySelector('#next').addEventListener('click', () => {
+      loadTrack(currentTrack + 1, true);
+    });
+    audio.addEventListener('ended', () => loadTrack(currentTrack + 1, true));
+    document.querySelector('#volume').addEventListener('input', e => {
+      audio.volume = Number(e.target.value);
+    });
+    audio.volume = 0.35;
+    if (PLAYLIST.length) loadTrack(0);
+
+    // 场景、相机、渲染器
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x101b2a);
+    scene.fog = new THREE.FogExp2(0x263748, 0.0062);
+
+    const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, 0.1, 250);
+    camera.position.set(47, 32, 62);
+
+    // Report a real failure instead of leaving a blank dark screen when the
+    // GPU or the three.js CDN import is unavailable.
+    function failToLoad(message) {
+      const loader = document.querySelector('#loader');
+      loader.classList.add('error');
+      loader.classList.remove('hidden');
+      document.querySelector('#loaderStatus').textContent = 'UNABLE TO START';
+      if (message) document.querySelector('#loaderError').textContent = message;
+    }
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.getContext();  // forces context creation so failures surface here
+    } catch (err) {
+      failToLoad();
+      throw err;
+    }
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.15 : 1.5));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+    document.body.appendChild(renderer.domElement);
+
+    // Portrait phones get a very narrow horizontal field of view at the
+    // desktop 43° vertical FOV — only about 20° at a 9:19.5 aspect — which
+    // crops the village down to a sliver. Widen the vertical FOV as the
+    // aspect narrows so the horizontal framing stays usable.
+    const BASE_FOV = 43;
+    function applyAspectFov() {
+      camera.aspect = innerWidth / innerHeight;
+      camera.fov = camera.aspect < 1
+        ? Math.min(66, BASE_FOV + (1 - camera.aspect) * 32)
+        : BASE_FOV;
+      camera.updateProjectionMatrix();
+    }
+    // Distance that keeps the market ring framed at the current FOV/aspect,
+    // clamped to the range OrbitControls allows.
+    function restingDistance() {
+      const halfHFov = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect);
+      return THREE.MathUtils.clamp(22 / Math.tan(halfHFov), 56, controls.maxDistance);
+    }
+    applyAspectFov();
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2.0, 0);
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.rotateSpeed = IS_TOUCH ? 0.55 : 0.65;
+    controls.zoomSpeed = IS_TOUCH ? 0.9 : 0.8;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI * 0.48;
+    // A phone screen needs to get closer to read a stall sign.
+    controls.minDistance = IS_TOUCH ? 12 : 22;
+    controls.maxDistance = 78;
+    // One finger orbits, two fingers dolly. Stated explicitly so a stray
+    // three-finger swipe cannot trigger the OS back gesture mid-drag.
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+
+    const hemisphere = new THREE.HemisphereLight(0xd8e7f5, 0x59483e, 0.52);
+    scene.add(hemisphere);
+
+    const sun = new THREE.DirectionalLight(0xffe2b4, 0.2);
+    sun.position.set(-18, 25, 14);
+    sun.castShadow = true;
+    // A 2048² shadow map costs a phone GPU dearly for very little visible gain
+    // at these screen sizes, so halve it on touch.
+    sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
+    sun.shadow.camera.left = -32;
+    sun.shadow.camera.right = 32;
+    sun.shadow.camera.top = 32;
+    sun.shadow.camera.bottom = -32;
+    sun.shadow.bias = -0.00025;
+    scene.add(sun);
+
+    const moonLight = new THREE.DirectionalLight(0xb5cce8, 0.92);
+    moonLight.position.set(12, 20, -16);
+    scene.add(moonLight);
+
+    // 星空
+    const starPositions = [];
+    for (let i = 0; i < 950; i++) {
+      const radius = 75 + Math.random() * 70;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.46;
+      starPositions.push(
+        radius * Math.sin(phi) * Math.cos(theta),
+        radius * Math.cos(phi) + 7,
+        radius * Math.sin(phi) * Math.sin(theta)
+      );
+    }
+
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute(starPositions, 3)
+    );
+
+    const starField = new THREE.Points(
+      starGeometry,
+      new THREE.PointsMaterial({
+        color: 0xe6efff,
+        size: 0.16,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false
+      })
+    );
+    scene.add(starField);
+
+    const moon = new THREE.Mesh(
+      new THREE.SphereGeometry(1.55, 32, 24),
+      new THREE.MeshBasicMaterial({ color: 0xf1e8d1 })
+    );
+    moon.position.set(-23, 19, -35);
+    scene.add(moon);
+
+    // 季节配色
+    const SEASONS = {
+      spring: { ground: 0x829b78, mountain: 0x61766a, fog: 0x9caeaa },
+      summer: { ground: 0x71865b, mountain: 0x586e62, fog: 0x9bab9e },
+      autumn: { ground: 0x9c7951, mountain: 0x72675b, fog: 0xb39d83 },
+      winter: { ground: 0xc5cdd0, mountain: 0x526274, fog: 0x9baab5 }
+    };
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0xe1e7e9,
+      roughness: 0.96
+    });
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(180, 180),
+      groundMaterial
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.12;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // 山峰
+    const mountainMaterials = [];
+
+    function makeMountain(x, z, radius, height, color) {
+      const geo = new THREE.ConeGeometry(radius, height, 8, 2);
+      const pos = geo.attributes.position;
+
+      for (let i = 0; i < pos.count; i++) {
+        const wobble = 0.92 + Math.random() * 0.16;
+        pos.setXYZ(i, pos.getX(i) * wobble, pos.getY(i), pos.getZ(i) * wobble);
+      }
+
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 1,
+        flatShading: true
+      });
+      mountainMaterials.push(mat);
+
+      const mountain = new THREE.Mesh(geo, mat);
+      mountain.position.set(x, height / 2 - 0.2, z);
+      mountain.castShadow = true;
+      mountain.receiveShadow = true;
+      scene.add(mountain);
+
+      const snowCap = new THREE.Mesh(
+        new THREE.ConeGeometry(radius * 0.36, height * 0.28, 8),
+        new THREE.MeshStandardMaterial({ color: 0xe6e8e2, roughness: 1 })
+      );
+      snowCap.position.set(x, height * 0.78, z);
+      scene.add(snowCap);
+    }
+
+    [
+      [-38, -34, 10, 13], [38, -34, 10, 13],
+      [-44, 8, 8, 11], [44, 8, 8, 11]
+    ].forEach(([x, z, r, h]) => makeMountain(x, z, r, h, 0x526274));
+
+    // 松树林
+    const trunkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x594637,
+      roughness: 1
+    });
+    const treeMaterials = [];
+
+    function makePine(x, z, scale = 1) {
+      const group = new THREE.Group();
+
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.18, 1.25, 7),
+        trunkMaterial
+      );
+      trunk.position.y = 0.62;
+      group.add(trunk);
+
+      for (let i = 0; i < 4; i++) {
+        const mat = new THREE.MeshStandardMaterial({
+          color: [0x315548, 0x3c6256, 0x29483f][i % 3],
+          roughness: 1
+        });
+        treeMaterials.push(mat);
+
+        const crown = new THREE.Mesh(
+          new THREE.ConeGeometry(1.05 * (1 - i * 0.16), 1.9, 9),
+          mat
+        );
+        crown.position.y = 1.2 + i * 0.85;
+        crown.castShadow = true;
+        group.add(crown);
+      }
+
+      group.position.set(x, 0, z);
+      group.scale.setScalar(scale);
+      scene.add(group);
+    }
+
+    // A sparse evergreen border keeps the village as the hero; warm fairy bulbs sparkle in the trees.
+    const treeLightMat = new THREE.MeshBasicMaterial({ color: 0xffd18a, toneMapped: false });
+    const garlandMat = new THREE.MeshStandardMaterial({ color:0x8b3f38, roughness:0.9 });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + 0.12;
+      const radius = 27 + (i % 3) * 1.6;
+      const x = Math.cos(a) * radius, z = Math.sin(a) * radius;
+      const scale = 0.9 + (i % 4) * 0.12;
+      makePine(x, z, scale);
+      const bulbs = new THREE.Group();
+      for (let j = 0; j < 7; j++) {
+        const t = j / 6;
+        const angle = t * Math.PI * 2.25;
+        const y = 1.0 + t * 3.25;
+        const r = (1.0 - t * 0.68) * scale;
+        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 8), treeLightMat);
+        bulb.position.set(Math.cos(angle) * r, y, Math.sin(angle) * r);
+        bulbs.add(bulb);
+      }
+      bulbs.position.set(x, 0, z); scene.add(bulbs);
+      const garlandPoints=[];
+      for(let k=0;k<=36;k++) { const t=k/36, a=t*Math.PI*5.5; const r=(1.02-t*.68)*scale; garlandPoints.push(new THREE.Vector3(Math.cos(a)*r,0.82+t*3.25,Math.sin(a)*r)); }
+      const garland=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(garlandPoints),72,0.035,5,false),garlandMat);
+      garland.position.set(x,0,z); scene.add(garland);
+      for(let b=0;b<5;b++) { const t=(b+.4)/5, a=t*Math.PI*5.5, r=(1.02-t*.68)*scale; const bauble=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),new THREE.MeshStandardMaterial({color:[0xa7473e,0xd7b36f,0x7f9b91,0xe8dfc8,b%2?0x9d3f39:0xd8b36d][b],metalness:.2,roughness:.35})); bauble.position.set(x+Math.cos(a)*r,0.82+t*3.25,z+Math.sin(a)*r); scene.add(bauble); }
+    }
+
+    // GRAND GLASS VILLAGE HOME — positioned beyond the two distant mountain ridges.
+    const cottage = new THREE.Group();
+    const homeFrameMat = new THREE.MeshStandardMaterial({ color: 0x3d514b, metalness: 0.48, roughness: 0.34 });
+    const homeTrimMat = new THREE.MeshStandardMaterial({ color: 0xe4c58c, metalness: 0.38, roughness: 0.32 });
+    const homeGlassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xb8d8d8, roughness: 0.12, metalness: 0.08,
+      transmission: 0.28, transparent: true, opacity: 0.72,
+      emissive: 0xffd49a, emissiveIntensity: 0.12, side: THREE.DoubleSide
+    });
+    const homeStoneMat = new THREE.MeshStandardMaterial({ color: 0xd5c8b3, roughness: 0.92 });
+    const homeRoofMat = new THREE.MeshStandardMaterial({ color: 0x263d39, metalness: 0.35, roughness: 0.42 });
+    function cottageBox(w,h,d,material,x,y,z,parent=cottage) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), material);
+      mesh.position.set(x,y,z); mesh.castShadow=true; mesh.receiveShadow=true; parent.add(mesh); return mesh;
+    }
+    // Wide stone base and tall glass walls: a spacious conservatory-style café.
+    cottageBox(16,0.7,11,homeStoneMat,0,0.35,0);
+    cottageBox(15.2,0.22,10.2,homeTrimMat,0,0.82,0);
+    cottageBox(15.0,6.2,0.18,homeGlassMat,0,4.0,5.0);
+    cottageBox(15.0,6.2,0.18,homeGlassMat,0,4.0,-5.0);
+    cottageBox(0.18,6.2,10.0,homeGlassMat,-7.5,4.0,0);
+    cottageBox(0.18,6.2,10.0,homeGlassMat,7.5,4.0,0);
+    // Elegant dark metal mullions and corner pillars.
+    for (const x of [-7.45,-5,-2.5,0,2.5,5,7.45]) {
+      cottageBox(0.13,6.25,0.16,homeFrameMat,x,4.0,5.08);
+      cottageBox(0.13,6.25,0.16,homeFrameMat,x,4.0,-5.08);
+    }
+    for (const z of [-5,-2.5,0,2.5,5]) {
+      cottageBox(0.16,6.25,0.13,homeFrameMat,-7.58,4.0,z);
+      cottageBox(0.16,6.25,0.13,homeFrameMat,7.58,4.0,z);
+    }
+    // Flat glass roof with a raised central lantern ridge.
+    cottageBox(15.8,0.22,10.8,homeRoofMat,0,7.18,0);
+    cottageBox(15.5,0.16,0.32,homeTrimMat,0,7.34,0);
+    for (const x of [-7.5,7.5]) cottageBox(0.28,0.32,10.7,homeTrimMat,x,7.32,0);
+    // Grand double entrance, warm fixed lanterns (no animation or flicker).
+    cottageBox(2.5,3.8,0.22,homeGlassMat,0,2.75,5.12);
+    cottageBox(0.12,4.0,0.25,homeTrimMat,-1.28,2.8,5.16);
+    cottageBox(0.12,4.0,0.25,homeTrimMat,1.28,2.8,5.16);
+    cottageBox(0.12,3.8,0.25,homeTrimMat,0,2.8,5.18);
+    const fixedLanternMat = new THREE.MeshStandardMaterial({
+      color:0xffd69a, emissive:0xffb85c, emissiveIntensity:0.42, roughness:0.3
+    });
+    for (const x of [-5.8,5.8]) {
+      const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.38,0.72,0.3),fixedLanternMat);
+      lantern.position.set(x,4.5,5.22); cottage.add(lantern);
+    }
+    // Visible HOME plaque.
+    const homeSignCanvas = document.createElement('canvas');
+    homeSignCanvas.width=900; homeSignCanvas.height=260;
+    const hctx=homeSignCanvas.getContext('2d');
+    hctx.fillStyle='#203b35'; hctx.fillRect(0,0,900,260);
+    hctx.strokeStyle='#e8c78d'; hctx.lineWidth=14; hctx.strokeRect(14,14,872,232);
+    hctx.fillStyle='#fff0d2'; hctx.font='bold 112px Georgia'; hctx.textAlign='center'; hctx.textBaseline='middle';
+    hctx.fillText('HOME',450,132);
+    const homeTex=new THREE.CanvasTexture(homeSignCanvas); homeTex.colorSpace=THREE.SRGBColorSpace;
+    const homeSign=new THREE.Mesh(new THREE.PlaneGeometry(9.2,2.65),new THREE.MeshBasicMaterial({map:homeTex,side:THREE.DoubleSide}));
+    homeSign.position.set(0,9.0,5.25); cottage.add(homeSign);
+    // Photo plaque: replace assets/photos/home.jpg with the HOME café photo.
+    const homePhotoFrame = new THREE.Mesh(new THREE.PlaneGeometry(3.1,1.8),homeTrimMat);
+    homePhotoFrame.position.set(0,1.85,5.28); cottage.add(homePhotoFrame);
+    const homePhoto = new THREE.Mesh(new THREE.PlaneGeometry(2.85,1.55),new THREE.MeshBasicMaterial({color:0xe8d9bf,side:THREE.DoubleSide}));
+    homePhoto.position.set(0,1.85,5.30); cottage.add(homePhoto);
+    const homePhotoImage = new Image();
+    homePhotoImage.onload = () => {
+      const tex = new THREE.Texture(homePhotoImage); tex.colorSpace=THREE.SRGBColorSpace; tex.needsUpdate=true;
+      homePhoto.material.map=tex; homePhoto.material.color.set(0xffffff); homePhoto.material.needsUpdate=true;
+    };
+    homePhotoImage.onerror = () => console.warn('HOME photo not found:',HOME_PHOTO);
+    homePhotoImage.src = HOME_PHOTO;
+    // Warm interior furniture visible through the glazing.
+    const tableMat = new THREE.MeshStandardMaterial({color:0x78533a,roughness:0.7});
+    for (const x of [-4.2,0,4.2]) {
+      cottageBox(1.8,0.18,1.15,tableMat,x,1.65,-1.0);
+      cottageBox(0.16,1.1,0.16,homeFrameMat,x,1.05,-1.0);
+      for (const z of [-1.8,-0.2]) cottageBox(0.55,0.85,0.55,homeStoneMat,x,0.95,z);
+    }
+    // Soft constant interior lighting only — no pulsing, flickering or animated porch light.
+    const homeLight = new THREE.PointLight(0xffc98c, 18, 34, 2);
+    homeLight.position.set(0,4.0,0); cottage.add(homeLight);
+    cottage.position.set(-48,0,-48);
+    cottage.rotation.y=0;
+    cottage.userData={kind:'home',name:'VILLAGE HOME',description:'A grand glasshouse café beyond the mountain ridge. Click to visit our homepage.',url:null};
+    scene.add(cottage);
+    scene.add(cottage);
+
+    // 营火
+    const fireGroup = new THREE.Group();
+    fireGroup.position.set(0, 0, 0);
+
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: 0x666761,
+      roughness: 1
+    });
+
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * Math.PI * 2;
+      const stone = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.34),
+        stoneMaterial
+      );
+      stone.position.set(Math.cos(a) * 1.2, 0.24, Math.sin(a) * 1.2);
+      stone.scale.set(1.2, 0.7, 0.9);
+      fireGroup.add(stone);
+    }
+
+    const logMaterial = new THREE.MeshStandardMaterial({
+      color: 0x573b29,
+      roughness: 1
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const log = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.18, 1.7, 8),
+        logMaterial
+      );
+      log.rotation.z = Math.PI / 2;
+      log.rotation.y = i * 1.05;
+      log.position.y = 0.38 + i * 0.1;
+      fireGroup.add(log);
+    }
+
+    const flame = new THREE.Mesh(
+      new THREE.ConeGeometry(0.48, 1.4, 9),
+      new THREE.MeshBasicMaterial({ color: 0xff8e43 })
+    );
+    flame.position.y = 1.12;
+    fireGroup.add(flame);
+    scene.add(fireGroup);
+
+    const fireLight = new THREE.PointLight(0xff9955, 23, 14, 2);
+    fireLight.position.set(0, 1.8, 0);
+    scene.add(fireLight);
+
+    // Cozy little log stools around the central communal fire.
+    const stoolWood = new THREE.MeshStandardMaterial({ color: 0x78543a, roughness: 0.9 });
+    for (let i=0;i<8;i++) {
+      const a=i/8*Math.PI*2;
+      const stool=new THREE.Mesh(new THREE.CylinderGeometry(0.48,0.55,0.62,12),stoolWood);
+      stool.position.set(Math.cos(a)*4.1,0.31,Math.sin(a)*4.1); stool.castShadow=true; stool.receiveShadow=true; scene.add(stool);
+      const seat=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.12,12),new THREE.MeshStandardMaterial({color:0xb58a5a,roughness:0.82}));
+      seat.position.set(stool.position.x,0.68,stool.position.z); scene.add(seat);
+    }
+
+    // ============================================================
+    // EASY EDIT ZONE — change words, links, and shop details here.
+    // Replace each url with your own website. Use "#" to disable a link.
+    // ============================================================
+    const HOME_URL = "https://makeawishcafe.com";
+
+    // --- UI TEXT (change any words on screen here) ---
+    const UI_TEXT = {
+      siteTitle: "The Village",
+      siteSubtitle: "Market World",
+      brandTagline: "Market World",
+      settingsTitle: "Village settings",
+      settingsClose: "Close settings",
+      atmosphereTitle: "SCENE ATMOSPHERE · 场景氛围",
+      atmosphereSubtitle: "Scene atmosphere · 场景氛围",
+      seasonLabel: "Season / 四季",
+      nightLabel: "Night ambience",
+      starsLabel: "Show stars",
+      sunlightLabel: "Sunlight",
+      selectionTitle: "Your selection · 当前选择",
+      selectionDefault: "Explore the village",
+      selectionHint: "Choose a stall to explore, or wander around the village.",
+      cameraViewLabel: "Camera view",
+      resetViewBtn: "↺ Reset view",
+      soundtrackTitle: "Village soundtrack · 音乐",
+      playlistLabel: "Playlist",
+      trackDefault: "Choose a track",
+      prevTrackBtn: "‹",
+      nextTrackBtn: "›",
+      volumeLabel: "Volume",
+      stallCount: "10 MARKET STALLS",
+      exploreBtn: "CLICK TO EXPLORE",
+      exploreListTitle: "EXPLORE THE VILLAGE",
+      closeListBtn: "×",
+      homeBtn: "⌂",
+      homeBtnTitle: "Go home",
+      walkForward: "Walk forward",
+      walkBack: "Walk backward",
+      walkLeft: "Walk left",
+      walkRight: "Walk right",
+      hoverEyebrow: "WELCOME TO THE VILLAGE",
+      hoverHomeName: "⌂ YOUR COSY HOME",
+      hoverHomeDesc: "A warm place at the edge of the village.",
+      hoverHomeEyebrow: "Home sweet home",
+      hoverVisitWebsite: "CLICK TO VISIT WEBSITE ↗",
+      hoverVisitHome: "CLICK TO GO HOME ↗",
+      desktopHint: "DESKTOP Drag to look around; use WASD or arrow keys to walk.",
+      mobileHint: "MOBILE Drag to look around; use the direction pad to walk.",
+      rotateHint: "Drag to rotate · Scroll/pinch to zoom",
+      toastNoLink: "Please add your homepage link in the EASY EDIT ZONE.",
+      loaderTitle: "The Village",
+      loaderStatus: "Warming up the village…",
+      loaderError: "This village needs WebGL and could not start. Try another browser, or check your connection — the 3D engine is loaded from a CDN."
+    };
+
+    // Apply UI_TEXT to page elements so all words are easy to change above.
+    function applyUIText() {
+      const set = (id, text) => { const el=document.getElementById(id); if(el) el.textContent=text; };
+      const setText = (selector, text) => { const el=document.querySelector(selector); if(el) el.textContent=text; };
+      set('selectedLabel', UI_TEXT.selectionDefault);
+      set('selectedHint', UI_TEXT.selectionHint);
+      set('hoverName', UI_TEXT.hoverHomeName);
+      set('hoverDesc', UI_TEXT.hoverHomeDesc);
+      setText('#hoverCard .eyebrow', UI_TEXT.hoverHomeEyebrow);
+      setText('#exploreToggle', UI_TEXT.exploreBtn);
+      document.querySelector('#homeBtn')?.setAttribute('title', UI_TEXT.homeBtnTitle);
+      document.querySelector('#homeBtn')?.setAttribute('aria-label', UI_TEXT.homeBtnTitle);
+      document.querySelector('[data-walk="forward"]')?.setAttribute('aria-label', UI_TEXT.walkForward);
+      document.querySelector('[data-walk="back"]')?.setAttribute('aria-label', UI_TEXT.walkBack);
+      document.querySelector('[data-walk="left"]')?.setAttribute('aria-label', UI_TEXT.walkLeft);
+      document.querySelector('[data-walk="right"]')?.setAttribute('aria-label', UI_TEXT.walkRight);
+      setText('.desktop-hint', UI_TEXT.desktopHint);
+      setText('.mobile-hint', UI_TEXT.mobileHint);
+      setText('#loaderStatus', UI_TEXT.loaderStatus);
+      setText('#loaderError', UI_TEXT.loaderError);
+      setText('.brand h1', UI_TEXT.siteTitle);
+      setText('.panel-head-title', UI_TEXT.settingsTitle);
+    }
+    applyUIText();
+
+    // --- SHOP STALLS (names, logos, links, colors) ---
+    const MARKET_STALLS = [
+      {name:"THE DAILY MARKET", logo:"DG", logoImage:PHOTOS[0], tagline:"Good things, slow moments.", url:"https://example.com", body:"#e8dfcb", roof:"#52736b", accent:"#c58b55", style:"classic"},
+      {name:"ROAM & ROOT", logo:"R&R", logoImage:PHOTOS[1], tagline:"Little discoveries along the way.", url:"https://example.com", body:"#d9a36f", roof:"#463a32", accent:"#f0d5a5", style:"retro"},
+      {name:"THE MORNING POST", logo:"MP", logoImage:PHOTOS[2], tagline:"A friendly stop along the way.", url:"https://example.com", body:"#d8e1dc", roof:"#a6533e", accent:"#f1d7a8", style:"awning"},
+      {name:"VELVET & PINE", logo:"VB", logoImage:PHOTOS[3], tagline:"Lovely things, lovely views.", url:"https://example.com", body:"#4b554e", roof:"#d7c5a4", accent:"#d9a76f", style:"modern"},
+      {name:"SUNNY SIDE GOODS", logo:"☼", logoImage:PHOTOS[4], tagline:"A brighter kind of day.", url:"https://example.com", body:"#e9c85f", roof:"#f5ead1", accent:"#b85e42", style:"awning"},
+      {name:"WILDWOOD MARKET", logo:"WW", logoImage:PHOTOS[5], tagline:"Forest air and handmade treasures.", url:"https://example.com", body:"#71836a", roof:"#3f4c3e", accent:"#d4b58a", style:"classic"},
+      {name:"NOMAD CORNER", logo:"CN", logoImage:PHOTOS[6], tagline:"Take the scenic route.", url:"https://example.com", body:"#d8c6b2", roof:"#637a89", accent:"#bd805e", style:"modern"},
+      {name:"LITTLE BRASS & CO", logo:"LB", logoImage:PHOTOS[7], tagline:"A tiny stall with a big heart.", url:"https://example.com", body:"#c28c5b", roof:"#493c32", accent:"#e7c68e", style:"retro"},
+      {name:"MOONBEAM MARKET", logo:"ME", logoImage:PHOTOS[8], tagline:"Little wonders beneath the stars.", url:"https://example.com", body:"#58647a", roof:"#d7d0c1", accent:"#e4b779", style:"modern"},
+      {name:"HONEY & OAK", logo:"H&O", logoImage:PHOTOS[9], tagline:"Warm welcomes, kind company.", url:"https://example.com", body:"#d7b98d", roof:"#65756b", accent:"#f2e6cf", style:"classic"}
+    ];
+
+    const vanPickTargets = [];
+    const marketVans = [];
+    const vanMaterials = [];
+    const selectedLabel = document.querySelector('#selectedLabel');
+    const selectedHint = document.querySelector('#selectedHint');
+    const hoverCard = document.querySelector('#hoverCard');
+    const hoverName = document.querySelector('#hoverName');
+    const hoverDesc = document.querySelector('#hoverDesc');
+    const hoverLogo = document.querySelector('#hoverLogo');
+    const hoverLink = document.querySelector('#hoverLink');
+    const toast = document.querySelector('#toast');
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let hoveredObject = null;
+    let pointerMoved = false;
+
+    function makeSignTexture(shop,index) {
+      const c=document.createElement('canvas'); c.width=900; c.height=280;
+      const ctx=c.getContext('2d');
+      function paint(image=null) {
+        ctx.clearRect(0,0,c.width,c.height);
+        ctx.fillStyle='#172526'; ctx.fillRect(0,0,c.width,c.height);
+        ctx.strokeStyle=shop.accent; ctx.lineWidth=15; ctx.strokeRect(13,13,c.width-26,c.height-26);
+        ctx.strokeStyle='rgba(255,224,174,.38)'; ctx.lineWidth=3; ctx.strokeRect(29,29,c.width-58,c.height-58);
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        if(image) {
+          const maxW=190, maxH=190, scale=Math.min(maxW/image.width,maxH/image.height);
+          const w=image.width*scale, h=image.height*scale;
+          ctx.fillStyle='#fff'; ctx.fillRect(48,45,204,190);
+          ctx.drawImage(image,150-w/2,140-h/2,w,h);
+        } else {
+          ctx.shadowColor='rgba(255,190,105,.22)'; ctx.shadowBlur=7;
+          ctx.fillStyle=shop.accent; ctx.font='bold 76px Georgia'; ctx.fillText(shop.logo,145,135);
+        }
+        ctx.shadowBlur=0; ctx.fillStyle='#fff0d6'; ctx.font='bold 66px Georgia';
+        let name=shop.name;
+        while(ctx.measureText(name).width>620 && ctx.font.match(/(\\d+)px/)) {
+          const size=Math.max(32,parseInt(ctx.font.match(/(\\d+)px/)[1])-3);
+          ctx.font=`bold ${size}px Georgia`;
+        }
+        ctx.fillText(name,560,132);
+        ctx.fillStyle='#e8bd7c'; ctx.font='bold 48px Georgia';
+        ctx.textAlign='right'; ctx.fillText(String(index+1).padStart(2,'0'),860,230);
+        ctx.textAlign='center';
+      }
+      paint();
+      const tex=new THREE.CanvasTexture(c); tex.colorSpace=THREE.SRGBColorSpace;
+      if(shop.logoImage) {
+        const image=new Image();
+        image.onload=()=>{ paint(image); tex.needsUpdate=true; };
+        image.onerror=()=>console.warn('Logo image not found:',shop.logoImage);
+        image.src=shop.logoImage;
+      }
+      return tex;
+    }
+
+    function createMarketVan(shop,index,position) {
+      const root=new THREE.Group(); root.position.set(position[0],0,position[1]);
+      const bodyMat=new THREE.MeshStandardMaterial({color:shop.body,roughness:0.48});
+      const roofMat=new THREE.MeshStandardMaterial({color:shop.roof,roughness:0.5});
+      const trimMat=new THREE.MeshStandardMaterial({color:shop.accent,metalness:0.25,roughness:0.42});
+      // On touch the per-van point light is dropped (see below), so push the
+      // emissive glass harder to keep the same warm-lit interior look.
+      const glassMat=new THREE.MeshStandardMaterial({color:0x314b52,roughness:0.18,metalness:0.12,emissive:0xffb86c,emissiveIntensity:IS_TOUCH?0.88:0.48});
+      const rubberMat=new THREE.MeshStandardMaterial({color:0x202426,roughness:0.9});
+      function box(w,h,d,mat,x,y,z,parent=root) {
+        const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+        m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; parent.add(m); return m;
+      }
+      // Rounded-looking retro delivery van body, with front facing +X
+      box(4.35,1.75,2.05,bodyMat,0,1.45,0);
+      box(2.55,0.78,2.0,roofMat,-0.12,2.68,0);
+      box(1.05,1.25,1.95,bodyMat,1.75,1.9,0);
+      // windscreen and side windows
+      box(0.055,0.78,1.48,glassMat,2.29,2.14,0);
+      box(1.0,0.62,0.055,glassMat,1.12,2.43,1.04);
+      box(1.0,0.62,0.055,glassMat,-0.35,2.43,1.04);
+      box(0.9,0.62,0.055,glassMat,-1.55,2.43,1.04);
+      // Matching warm-lit service windows on the opposite side
+      for (const x of [1.12,-0.35,-1.55]) box(0.95,0.66,0.055,glassMat,x,2.43,-1.04);
+      // service hatch, counter and awning
+      box(2.0,0.88,0.08,glassMat,-0.15,2.05,1.08);
+      box(2.0,0.88,0.08,glassMat,-0.15,2.05,-1.08);
+      box(2.35,0.12,0.55,trimMat,-0.15,2.57,1.28);
+      const awning=box(2.5,0.12,0.95,shop.style==='awning'?trimMat:roofMat,-0.15,3.02,1.2);
+      awning.rotation.x=-0.12;
+      // stripe and front bumper
+      box(4.2,0.12,0.07,trimMat,0,1.18,1.04);
+      box(0.16,0.18,2.2,trimMat,2.31,0.78,0);
+      // wheels on both sides
+      for(const x of [-1.35,1.45]) for(const side of [-1,1]) {
+        const wheel=new THREE.Mesh(new THREE.CylinderGeometry(0.48,0.48,0.24,24),rubberMat);
+        wheel.rotation.x=Math.PI/2; wheel.position.set(x,0.65,side*1.03); wheel.castShadow=true; root.add(wheel);
+        const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.26,20),trimMat);
+        hub.rotation.x=Math.PI/2; hub.position.copy(wheel.position); root.add(hub);
+      }
+      // Headlights
+      for(const z of [-0.72,0.72]) {
+        const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.16,16,12),new THREE.MeshStandardMaterial({color:0xffe2a6,emissive:0xffb84e,emissiveIntensity:1.1}));
+        lamp.position.set(2.32,1.2,z); root.add(lamp);
+      }
+      // Large, softly illuminated dark-and-gold signs: readable from both sides and both ends
+      const signTex=makeSignTexture(shop,index);
+      const signMat=new THREE.MeshBasicMaterial({map:signTex,side:THREE.DoubleSide,toneMapped:false});
+      const sideSignA=new THREE.Mesh(new THREE.PlaneGeometry(3.75,1.18),signMat);
+      sideSignA.position.set(-0.15,3.52,1.23); root.add(sideSignA);
+      const sideSignB=new THREE.Mesh(new THREE.PlaneGeometry(3.75,1.18),signMat);
+      sideSignB.position.set(-0.15,3.52,-1.23); sideSignB.rotation.y=Math.PI; root.add(sideSignB);
+      const endSignA=new THREE.Mesh(new THREE.PlaneGeometry(1.95,0.82),signMat);
+      endSignA.position.set(2.36,2.05,0); endSignA.rotation.y=Math.PI/2; root.add(endSignA);
+      const endSignB=new THREE.Mesh(new THREE.PlaneGeometry(1.95,0.82),signMat);
+      endSignB.position.set(-2.20,2.05,0); endSignB.rotation.y=-Math.PI/2; root.add(endSignB);
+      // Small roof trim
+      box(4.0,0.09,2.08,trimMat,0,3.1,0);
+      const roofSnow=new THREE.Mesh(new THREE.BoxGeometry(3.8,.075,1.9),new THREE.MeshStandardMaterial({color:0xe8edef,roughness:1})); roofSnow.position.set(-.05,3.17,0); root.add(roofSnow);
+      const miniWreath=new THREE.Mesh(new THREE.TorusGeometry(.23,.055,7,18),new THREE.MeshStandardMaterial({color:0x42634c,roughness:.9})); miniWreath.position.set(-1.72,1.85,1.105); root.add(miniWreath);
+      const wreathBerry=new THREE.Mesh(new THREE.SphereGeometry(.07,10,8),new THREE.MeshStandardMaterial({color:0xb94d42,emissive:0x3a0905})); wreathBerry.position.set(-1.72,2.06,1.14); root.add(wreathBerry);
+      // Each van gets a distinct roof silhouette and a warm interior glow.
+      const roofDetails = index % 4;
+      if (roofDetails === 0) {
+        const roofLantern = new THREE.Group();
+        const lanternBody = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.48,0.42),new THREE.MeshStandardMaterial({color:0xf4dfb8,emissive:0xffb85c,emissiveIntensity:0.55}));
+        const lanternCap = new THREE.Mesh(new THREE.ConeGeometry(0.34,0.22,4),trimMat);
+        lanternCap.position.y=0.34; roofLantern.add(lanternBody,lanternCap);
+        roofLantern.position.set(-0.65,3.38,0); root.add(roofLantern);
+      } else if (roofDetails === 1) {
+        for (let k=-1;k<=1;k++) box(0.09,0.32,2.05,trimMat,k*0.62,3.25,0);
+      } else if (roofDetails === 2) {
+        const roofBadge = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.38,0.22),trimMat); roofBadge.position.set(-0.3,3.32,0); root.add(roofBadge);
+      } else {
+        const roofRack = box(1.4,0.1,1.35,trimMat,-0.5,3.35,0);
+      }
+      // Ten point lights — one per van — are the most expensive single thing in
+      // this scene on a phone GPU: in three.js' forward renderer each one adds
+      // a term to every lit pixel on screen. Emissive glass reads almost the
+      // same at these sizes, so skip them entirely on touch.
+      if (!IS_TOUCH) {
+        const interiorGlow = new THREE.PointLight(0xffbd78, 3.2, 7, 2);
+        interiorGlow.position.set(-0.2,2.35,0); root.add(interiorGlow);
+      }
+      // Van is arranged tangentially around the fire, with its front facing inward.
+      const angle = Math.atan2(position[1], position[0]);
+      root.rotation.y = Math.PI - angle;
+      root.userData={kind:'van',shop,index};
+      scene.add(root); marketVans.push(root); vanPickTargets.push(...root.children.filter(o=>o.isMesh));
+      return root;
+    }
+
+    const vanRadius = 19.5;
+    const vanSpots = MARKET_STALLS.map((_,i) => {
+      const angle = -Math.PI/2 + (i / MARKET_STALLS.length) * Math.PI * 2;
+      return [Math.cos(angle) * vanRadius, Math.sin(angle) * vanRadius];
+    });
+
+    MARKET_STALLS.forEach((shop,i)=>createMarketVan(shop,i,vanSpots[i]));
+
+    // Numbered stall directory: choose a stall to move the view to that location.
+    // exploreList / exploreToggle and their open-close listeners live in the
+    // overlay manager near the top of this module.
+    const exploreItems=document.querySelector('#exploreItems');
+    MARKET_STALLS.forEach((stall,i)=>{
+      const button=document.createElement('button');
+      button.type='button';
+      button.innerHTML='<span>'+String(i+1).padStart(2,'0')+'</span>'+stall.name;
+      button.addEventListener('click',()=>{
+        const destination=marketVans[i].position.clone();
+        const outward=destination.clone().normalize();
+        camera.position.copy(destination.clone().add(outward.multiplyScalar(8)).add(new THREE.Vector3(0,5,0)));
+        controls.target.copy(destination);
+        controls.update();
+        selectedLabel.textContent=String(i+1).padStart(2,'0')+' · '+stall.name;
+        selectedHint.textContent='You are visiting this stall. Walk around to explore nearby.';
+        setExploreOpen(false);
+      });
+      exploreItems.appendChild(button);
+    });
+
+    // Step-by-step walking: WASD / arrow keys on desktop, direction pad on phones.
+    const walkState={forward:false,back:false,left:false,right:false};
+    const walkKeys={KeyW:'forward',ArrowUp:'forward',KeyS:'back',ArrowDown:'back',
+      KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right'};
+    window.addEventListener('keydown',event=>{
+      const direction=walkKeys[event.code];
+      if(direction){walkState[direction]=true;event.preventDefault();}
+    });
+    window.addEventListener('keyup',event=>{
+      const direction=walkKeys[event.code];
+      if(direction)walkState[direction]=false;
+    });
+    function stopAllWalking(){
+      Object.keys(walkState).forEach(k=>walkState[k]=false);
+      document.querySelectorAll('[data-walk]').forEach(b=>b.classList.remove('is-pressed'));
+    }
+    window.addEventListener('blur',stopAllWalking);
+    // Backgrounding the tab must never leave a direction latched on.
+    document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopAllWalking(); });
+
+    // Pointer capture is what makes a held direction reliable. Without it a
+    // finger that slides off the pad fires pointerup on some other element and
+    // walkState stays true forever, so the camera drifts with no way to stop
+    // short of reloading. Capture also means sliding off no longer cancels the
+    // press, which is how a real D-pad behaves.
+    document.querySelectorAll('[data-walk]').forEach(button=>{
+      const direction=button.dataset.walk;
+      button.addEventListener('pointerdown',event=>{
+        event.preventDefault();
+        if(button.setPointerCapture && event.pointerId!=null){
+          try { button.setPointerCapture(event.pointerId); } catch(e){ /* already captured */ }
+        }
+        walkState[direction]=true;
+        button.classList.add('is-pressed');
+      });
+      const release=event=>{
+        if(event) event.preventDefault();
+        walkState[direction]=false;
+        button.classList.remove('is-pressed');
+      };
+      ['pointerup','pointercancel','lostpointercapture'].forEach(type=>button.addEventListener(type,release));
+    });
+    function stepWalk(delta){
+      const forward=new THREE.Vector3();
+      camera.getWorldDirection(forward);forward.y=0;forward.normalize();
+      const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
+      const movement=new THREE.Vector3();
+      if(walkState.forward)movement.add(forward);
+      if(walkState.back)movement.sub(forward);
+      if(walkState.right)movement.add(right);
+      if(walkState.left)movement.sub(right);
+      if(movement.lengthSq()>0){
+        // Units per second rather than per frame, so walking no longer runs at
+        // half speed on a phone that renders at 30fps instead of 60.
+        movement.normalize().multiplyScalar((IS_TOUCH?9:13.2)*delta);
+        camera.position.add(movement);controls.target.add(movement);
+        const limit=62;
+        camera.position.x=THREE.MathUtils.clamp(camera.position.x,-limit,limit);
+        camera.position.z=THREE.MathUtils.clamp(camera.position.z,-limit,limit);
+        controls.target.x=THREE.MathUtils.clamp(controls.target.x,-limit,limit);
+        controls.target.z=THREE.MathUtils.clamp(controls.target.z,-limit,limit);
+      }
+    }
+
+
+    // Put the home cottage in the village centre, slightly behind the market stops
+    cottage.position.set(-29,0,-24);
+    vanPickTargets.push(...cottage.children.filter(o=>o.isMesh));
+
+    function setSelected(item) {
+      if (!item) {
+        selectedLabel.textContent='Explore the village';
+        selectedHint.textContent='Choose a stall to explore, or wander around the village.';
+        return;
+      }
+      if(item.userData.kind==='home') {
+        selectedLabel.textContent='⌂ Your Cosy Home';
+        selectedHint.textContent='Visit the village home.';
+      } else {
+        selectedLabel.textContent=item.userData.shop.name;
+        selectedHint.textContent='VAN '+String(item.userData.index+1).padStart(2,'0')+' · '+item.userData.shop.tagline+' · Click to visit';
+      }
+    }
+
+    function updatePointer(event) {
+      const rect=renderer.domElement.getBoundingClientRect();
+      pointer.x=((event.clientX-rect.left)/rect.width)*2-1;
+      pointer.y=-((event.clientY-rect.top)/rect.height)*2+1;
+      raycaster.setFromCamera(pointer,camera);
+    }
+    function findRoot(mesh) {
+      let node=mesh;
+      while(node && !node.userData.kind) node=node.parent;
+      return node;
+    }
+    // On touch the first tap arms a stall and the second opens it; this holds
+    // the armed stall. Declared above hideHoverCard, which clears it.
+    let mobileArmedItem = null;
+    let hoverTimer = null;
+    function hideHoverCard() {
+      hoverCard.style.display='none';
+      hoverCard.classList.remove('docked');
+      mobileArmedItem=null;
+      clearTimeout(hoverTimer);
+      document.body.style.cursor='grab';
+    }
+    function showHover(item,event) {
+      if(!item || (item.userData.kind!=='van' && item.userData.kind!=='home')) {
+        hideHoverCard(); return;
+      }
+      // A hybrid laptop reports pointer:fine but still produces touch events,
+      // so trust the event as well as the cached capability.
+      const touchMode = IS_TOUCH || (event && event.pointerType==='touch');
+      document.body.style.cursor='pointer';
+      const verb = touchMode ? 'TAP' : 'CLICK';   // "CLICK" is wrong on a phone
+      if(item.userData.kind==='home') {
+        hoverName.textContent='⌂ YOUR COSY HOME';
+        hoverDesc.textContent='A warm place at the edge of the village.';
+        hoverCard.querySelector('.eyebrow').textContent='Home sweet home';
+        hoverLogo.style.display='none';
+        hoverLink.textContent=verb+' TO GO HOME ↗';
+        hoverLink.href=HOME_URL;
+      } else {
+        const s=item.userData.shop;
+        hoverName.textContent='VAN '+String(item.userData.index+1).padStart(2,'0')+' · '+s.name; hoverDesc.textContent=s.tagline;
+        hoverCard.querySelector('.eyebrow').textContent='MARKET STALL';
+        if(s.logoImage) { hoverLogo.src=s.logoImage; hoverLogo.style.display='block'; }
+        else { hoverLogo.removeAttribute('src'); hoverLogo.style.display='none'; }
+        hoverLink.textContent=verb+' TO VISIT WEBSITE ↗';
+        hoverLink.href=(s.url && s.url!=='#')?s.url:'#';
+      }
+      hoverCard.classList.toggle('docked', !!touchMode);
+      hoverCard.style.display='block';
+      clearTimeout(hoverTimer);
+      if(touchMode) {
+        // .docked positions the sheet via CSS; clear any stale inline left/top
+        // left over from a previous desktop hover so it cannot fight the class.
+        hoverCard.style.left=''; hoverCard.style.top='';
+        // Auto-dismiss, so one stray tap cannot leave the sheet covering the
+        // village with no obvious way back.
+        hoverTimer=setTimeout(hideHoverCard,6000);
+      } else if(event) {
+        const x=Math.min(event.clientX+16,innerWidth-250);
+        const y=Math.min(event.clientY+16,innerHeight-130);
+        hoverCard.style.left=Math.max(8,x)+'px'; hoverCard.style.top=Math.max(8,y)+'px';
+      }
+    }
+    hoverLink.addEventListener('click', event => {
+      if(!hoverLink.getAttribute('href') || hoverLink.getAttribute('href')==='#' || hoverLink.href==='https://example.com/') {
+        event.preventDefault();
+        toast.textContent='Please add this stall website in the market stall list.';
+        toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),2600);
+      }
+    });
+
+    function openDestination(item) {
+      let url;
+      if(item.userData.kind==='home') url=HOME_URL;
+      else url=item.userData.shop.url;
+      if(!url || url==='#' || url==='https://example.com') {
+        toast.textContent='Please add your own website link in the EASY EDIT ZONE.';
+        toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),2600); return;
+      }
+      toast.textContent='Opening '+(item.userData.kind==='home'?'your homepage':item.userData.shop.name)+'…';
+      toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1800);
+      window.open(url,'_blank','noopener,noreferrer');
+    }
+
+    // DESKTOP: hover to preview, click the same 3D object to visit its link.
+    // TOUCH: first tap previews the details sheet, second tap on the same
+    // object visits. The sheet's own button also works now.
+    renderer.domElement.addEventListener('pointermove',event=>{
+      if(event.pointerType==='touch') return;
+      updatePointer(event);
+      const hits=raycaster.intersectObjects(vanPickTargets,false);
+      const item=hits.length?findRoot(hits[0].object):null;
+      if(item!==hoveredObject) { hoveredObject=item; setSelected(item); }
+      showHover(item,event);
+    });
+    renderer.domElement.addEventListener('pointerleave',event=>{
+      if(event.pointerType==='touch') return;
+      hoveredObject=null; hideHoverCard(); setSelected(null);
+    });
+
+    // Tell a tap apart from the end of an orbit drag. The old `click` listener
+    // fired after every drag, so simply looking around could pop a sheet or
+    // navigate away. Multi-touch (pinch) is explicitly never treated as a tap.
+    const TAP_MOVE_PX=10, TAP_TIME_MS=400;
+    let activePointerId=null, downX=0, downY=0, downTime=0;
+    renderer.domElement.addEventListener('pointerdown',event=>{
+      if(activePointerId!==null) { activePointerId=null; return; }  // second finger
+      activePointerId=event.pointerId;
+      downX=event.clientX; downY=event.clientY; downTime=performance.now();
+    });
+    renderer.domElement.addEventListener('pointerup',event=>{
+      if(event.pointerId!==activePointerId) return;
+      activePointerId=null;
+      const moved=Math.hypot(event.clientX-downX, event.clientY-downY);
+      if(moved>TAP_MOVE_PX || (performance.now()-downTime)>TAP_TIME_MS) return;
+      handleTap(event);
+    });
+    renderer.domElement.addEventListener('pointercancel',event=>{
+      if(event.pointerId===activePointerId) activePointerId=null;
+    });
+
+    function handleTap(event) {
+      // Trust the event's pointer type too, so a touchscreen laptop gets the
+      // safe two-tap flow instead of navigating on the first touch.
+      const touchMode = IS_TOUCH || event.pointerType==='touch';
+      updatePointer(event);
+      const hits=raycaster.intersectObjects(vanPickTargets,false);
+      if(!hits.length) {
+        if(touchMode) hideHoverCard();
+        return;
+      }
+      const item=findRoot(hits[0].object);
+      if(!item || (item.userData.kind!=='van' && item.userData.kind!=='home')) return;
+      if(touchMode) {
+        if(mobileArmedItem===item) {
+          mobileArmedItem=null;
+          openDestination(item);
+        } else {
+          mobileArmedItem=item;
+          hoveredObject=item; setSelected(item); showHover(item,event);
+        }
+      } else {
+        openDestination(item);
+      }
+    }
+
+    // The sheet is interactive on touch, so give it a working dismiss button
+    // and stop its clicks reaching the canvas tap logic underneath.
+    document.querySelector('#hoverClose').addEventListener('click',event=>{
+      event.stopPropagation();
+      hideHoverCard();
+    });
+    hoverCard.addEventListener('pointerdown',event=>event.stopPropagation());
+    document.querySelector('#resetView').addEventListener('click',()=>{
+      introActive=false;
+      camera.position.copy(new THREE.Vector3(31,22,42).normalize().multiplyScalar(restingDistance()));
+      controls.target.set(0,1.8,0);
+      controls.update();
+    });
+
+
+    // ============================================================
+    // 30 WOODLAND FRIENDS — procedural 3D animals, no model files.
+    // They wander freely across the whole village with random turns,
+    // pauses and changing speeds (not a circular parade).
+    // ============================================================
+    const animalSpecs = [
+      {kind:'squirrel', color:0xb96f3d, belly:0xf1d7b5, ears:'point', tail:'big'},
+      {kind:'squirrel', color:0xc9844d, belly:0xf6dfc2, ears:'point', tail:'big'},
+      {kind:'squirrel', color:0x98552f, belly:0xf0d6b8, ears:'point', tail:'big'},
+      {kind:'cat', color:0x85817b, belly:0xe9dfd0, ears:'point', tail:'long'},
+      {kind:'cat', color:0xd0a06f, belly:0xffedda, ears:'point', tail:'long'},
+      {kind:'cat', color:0x393b40, belly:0xd9d5d0, ears:'point', tail:'long'},
+      {kind:'dog', color:0xc99558, belly:0xf0dfc5, ears:'flop', tail:'long'},
+      {kind:'dog', color:0x8c654b, belly:0xe8d4bb, ears:'flop', tail:'long'},
+      {kind:'dog', color:0xe1cda8, belly:0xfff5e4, ears:'flop', tail:'long'},
+      {kind:'rabbit', color:0xe6ddd0, belly:0xffffff, ears:'long', tail:'short'},
+      {kind:'rabbit', color:0xb8a99a, belly:0xf5e8dc, ears:'long', tail:'short'},
+      {kind:'rabbit', color:0xc98f78, belly:0xffe9dc, ears:'long', tail:'short'},
+      {kind:'bear', color:0x8a6048, belly:0xd9b99a, ears:'round', tail:'short'},
+      {kind:'polar-bear', color:0xf0eee6, belly:0xffffff, ears:'round', tail:'short'},
+      {kind:'polar-bear', color:0xe3e0d7, belly:0xffffff, ears:'round', tail:'short'},
+      {kind:'penguin', color:0x273744, belly:0xf7f5ed, ears:'round', tail:'short'},
+      {kind:'penguin', color:0x344a59, belly:0xffffff, ears:'round', tail:'short'},
+      {kind:'penguin', color:0x1d2934, belly:0xf4f1e8, ears:'round', tail:'short'},
+      {kind:'reindeer', color:0x986b48, belly:0xf0dfc5, ears:'point', tail:'short'},
+      {kind:'reindeer', color:0xb17d50, belly:0xf5e5ca, ears:'point', tail:'short'},
+      {kind:'reindeer', color:0x76513b, belly:0xe9d6bc, ears:'point', tail:'short'},
+      {kind:'fox', color:0xc86c3c, belly:0xffe4c4, ears:'point', tail:'big'},
+      {kind:'fox', color:0xb95732, belly:0xffe8d2, ears:'point', tail:'big'},
+      {kind:'raccoon', color:0x777b80, belly:0xdedbd2, ears:'round', tail:'striped'},
+      {kind:'raccoon', color:0x62666c, belly:0xe6e1d8, ears:'round', tail:'striped'},
+      {kind:'hedgehog', color:0x96745b, belly:0xe8d7c2, ears:'round', tail:'short'},
+      {kind:'hedgehog', color:0x82634e, belly:0xf0dfca, ears:'round', tail:'short'},
+      {kind:'deer', color:0xb78a5e, belly:0xf1dfc3, ears:'point', tail:'short'},
+      {kind:'panda', color:0xf0eee8, belly:0xffffff, ears:'round', tail:'short'},
+      {kind:'panda', color:0xe7e4dc, belly:0xffffff, ears:'round', tail:'short'}
+    ];
+    const woodlandFriends=[];
+    const animalMat=(color,rough=0.9)=>new THREE.MeshStandardMaterial({color,roughness:rough});
+    function addAnimalPart(parent,geometry,material,pos,scale=null) {
+      const mesh=new THREE.Mesh(geometry,material); mesh.position.set(...pos);
+      if(scale) mesh.scale.set(...scale); mesh.castShadow=true; mesh.receiveShadow=true; parent.add(mesh); return mesh;
+    }
+    animalSpecs.forEach((spec,i)=>{
+      const animal=new THREE.Group();
+      const fur=animalMat(spec.color), cream=animalMat(spec.belly), dark=animalMat(0x292522),
+            pink=animalMat(0xd58e88), orange=animalMat(0xd98235), antlerMat=animalMat(0xc7a77d);
+      const isPenguin=spec.kind==='penguin';
+      const isPolar=spec.kind==='polar-bear';
+      const isReindeer=spec.kind==='reindeer';
+      const bodyScale=isPenguin?[.88,1.12,.92]:isPolar?[1.18,1.02,1.45]:[1.05,.82,1.35];
+      addAnimalPart(animal,new THREE.SphereGeometry(.48,16,12),fur,[0,.52,0],bodyScale);
+      addAnimalPart(animal,new THREE.SphereGeometry(.34,16,12),fur,[0,1.02,.34],[.95,.95,.92]);
+      addAnimalPart(animal,new THREE.SphereGeometry(isPenguin?.30:.23,14,10),cream,
+        [0,.48,.43],isPenguin?[.92,1.15,.58]:[.9,.9,.55]);
+
+      // Ears: rabbit, cat, fox, deer and woodland friends.
+      if(spec.ears==='point') {
+        for(const x of [-.22,.22]) addAnimalPart(animal,new THREE.ConeGeometry(.13,.36,8),fur,[x,1.35,.32]);
+      } else if(spec.ears==='round') {
+        for(const x of [-.25,.25]) addAnimalPart(animal,new THREE.SphereGeometry(.14,12,8),fur,[x,1.28,.30]);
+      } else if(spec.ears==='flop') {
+        for(const x of [-.28,.28]) { const e=addAnimalPart(animal,new THREE.SphereGeometry(.16,12,8),fur,[x,1.12,.28],[.75,1.5,.7]); e.rotation.z=x<0?-.45:.45; }
+      } else if(spec.ears==='long') {
+        for(const x of [-.17,.17]) { const e=addAnimalPart(animal,new THREE.SphereGeometry(.105,12,8),fur,[x,1.48,.32],[.72,2.1,.65]); e.rotation.z=x<0?-.16:.16; }
+      }
+
+      // Reindeer antlers: branching warm ivory silhouettes.
+      if(isReindeer) {
+        for(const x of [-.23,.23]) {
+          const stem=addAnimalPart(animal,new THREE.CylinderGeometry(.035,.055,.43,7),antlerMat,[x,1.48,.22]);
+          stem.rotation.z=x<0?-.22:.22;
+          for(const side of [-1,1]) {
+            const tine=addAnimalPart(animal,new THREE.CylinderGeometry(.025,.04,.23,7),antlerMat,
+              [x+side*.10,1.62,.22]);
+            tine.rotation.z=side<0?-.65:.65;
+          }
+        }
+      }
+
+      // Eyes and muzzle. Penguins get a tiny orange beak and feet.
+      for(const x of [-.12,.12]) addAnimalPart(animal,new THREE.SphereGeometry(.045,8,8),dark,[x,1.08,.64]);
+      if(isPenguin) {
+        addAnimalPart(animal,new THREE.ConeGeometry(.085,.19,8),orange,[0,.96,.78],[1,1,.8]).rotation.x=Math.PI/2;
+      } else {
+        addAnimalPart(animal,new THREE.SphereGeometry(.09,10,8),cream,[0,.91,.67],[1.2,.72,.8]);
+        addAnimalPart(animal,new THREE.SphereGeometry(.045,8,8),pink,[0,.94,.74]);
+      }
+
+      // Flippers for penguins; four short legs for other animals.
+      const legs=[];
+      if(isPenguin) {
+        for(const x of [-.48,.48]) {
+          const wing=addAnimalPart(animal,new THREE.CapsuleGeometry(.10,.42,4,8),fur,[x,.65,.02]);
+          wing.rotation.z=x<0?-.35:.35;
+        }
+        for(const x of [-.19,.19]) {
+          const foot=addAnimalPart(animal,new THREE.SphereGeometry(.12,10,8),orange,[x,.12,.32],[1.35,.45,1.6]);
+          legs.push(foot);
+        }
+      } else {
+        for(const x of [-.27,.27]) for(const z of [-.27,.34]) {
+          const leg=addAnimalPart(animal,new THREE.CylinderGeometry(.075,.09,.34,8),fur,[x,.22,z]);
+          legs.push(leg);
+        }
+      }
+
+      // Tails.
+      if(spec.tail==='big') {
+        const tail=addAnimalPart(animal,new THREE.TorusGeometry(.27,.13,8,16),fur,[-.48,.78,-.35]);
+        tail.rotation.y=.8; tail.rotation.x=.35;
+      } else if(spec.tail==='striped') {
+        const tail=addAnimalPart(animal,new THREE.CylinderGeometry(.09,.18,.62,10),fur,[-.48,.58,-.35]);
+        tail.rotation.z=-.9;
+        for(let b=0;b<2;b++) addAnimalPart(animal,new THREE.TorusGeometry(.13,.035,6,12),cream,[-.48-b*.12,.68-b*.16,-.35]);
+      } else {
+        const tail=addAnimalPart(animal,new THREE.CapsuleGeometry(.09,.28,4,8),fur,[-.48,.7,-.35]);
+        tail.rotation.z=-.8;
+      }
+
+      const scale=isPenguin?.62:(isPolar?0.86:(isReindeer?0.76:0.68));
+      animal.scale.setScalar(scale);
+      // Spawn throughout the whole village instead of in a ring around the fire.
+      const spawnX=(Math.random()-.5)*54;
+      const spawnZ=(Math.random()-.5)*54;
+      const heading=Math.random()*Math.PI*2;
+      const speed=.75+Math.random()*1.45;
+      animal.userData={
+        vx:Math.sin(heading)*speed, vz:Math.cos(heading)*speed,
+        speed, turnIn:1+Math.random()*3.5, pause:Math.random()<.12?1+Math.random()*2:0,
+        legs, phase:Math.random()*Math.PI*2, gait:5+Math.random()*3,
+        bob:.035+Math.random()*.04, kind:spec.kind
+      };
+      animal.position.set(spawnX,0,spawnZ);
+      animal.rotation.y=heading;
+      scene.add(animal); woodlandFriends.push(animal);
+    });
+    // 季节粒子
+    // Each particle is stepped in JS and the whole buffer is re-uploaded to the
+    // GPU every frame, so use roughly half as many on touch devices.
+    const particleCount = IS_TOUCH ? 850 : 1900;
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleSpeeds = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      particlePositions[i * 3] = (Math.random() - 0.5) * 65;
+      particlePositions[i * 3 + 1] = Math.random() * 28;
+      particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 65;
+      particleSpeeds[i] = 0.012 + Math.random() * 0.035;
+    }
+
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(particlePositions, 3)
+    );
+
+    const particleMaterial = new THREE.PointsMaterial({
+      color: 0xf2f5f3,
+      size: 0.13,
+      transparent: true,
+      opacity: 0.78,
+      depthWrite: false
+    });
+
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(particles);
+
+    function setSeason(name) {
+      const setting = SEASONS[name];
+      groundMaterial.color.setHex(setting.ground);
+      mountainMaterials.forEach(mat => mat.color.setHex(setting.mountain));
+
+      treeMaterials.forEach((mat, i) => {
+        if (name === 'autumn') {
+          mat.color.setHex([0x875c35, 0xa1753f, 0x6d5936][i % 3]);
+        } else if (name === 'spring') {
+          mat.color.setHex([0x496c4d, 0x61805a, 0x365c47][i % 3]);
+        } else if (name === 'summer') {
+          mat.color.setHex([0x244a38, 0x315b40, 0x3a6847][i % 3]);
+        } else {
+          mat.color.setHex([0x29443f, 0x315047, 0x3c5a50][i % 3]);
+        }
+      });
+
+      if (name === 'autumn') particleMaterial.color.setHex(0xe7b770);
+      else if (name === 'spring') particleMaterial.color.setHex(0xf4d7cf);
+      else if (name === 'summer') particleMaterial.color.setHex(0xdcebd0);
+      else particleMaterial.color.setHex(0xf2f5ff);
+
+      particleMaterial.opacity = name === 'winter' ? 0.82 : 0.42;
+      particleMaterial.size = name === 'winter' ? 0.14 : 0.075;
+
+      if (!document.querySelector('#night').checked) {
+        scene.fog.color.setHex(setting.fog);
+      }
+    }
+
+    document.querySelector('#season').addEventListener('change', event => {
+      setSeason(event.target.value);
+    });
+
+    // 昼夜、星空和阳光亮度
+    const nightToggle = document.querySelector('#night');
+    const starsToggle = document.querySelector('#stars');
+    const sunlightSlider = document.querySelector('#sunlight');
+
+    function updateLighting() {
+      const isNight = nightToggle.checked;
+      const season = document.querySelector('#season').value;
+
+      sun.intensity = Number(sunlightSlider.value) * (isNight ? 0.16 : 1);
+      hemisphere.intensity = isNight ? 0.45 : 1.25;
+      moonLight.intensity = isNight ? 0.75 : 0.12;
+      scene.background.set(isNight ? 0x101827 : 0x9bb8cb);
+      scene.fog.color.setHex(isNight ? 0x263747 : SEASONS[season].fog);
+      starField.visible = isNight && starsToggle.checked;
+      moon.visible = isNight;
+      renderer.toneMappingExposure = isNight ? 1.12 : 1.22;
+    }
+
+    nightToggle.addEventListener('change', updateLighting);
+    starsToggle.addEventListener('change', updateLighting);
+    sunlightSlider.addEventListener('input', updateLighting);
+    updateLighting();
+
+    // Opening establishing shot: reveal the whole village, then gently move
+    // closer. A single time-based sweep — the old frame-counted zoom ran at
+    // the same time and fought this one, so where the camera ended up depended
+    // on the device frame rate.
+    const introStart = performance.now();
+    const introDir = new THREE.Vector3(31, 22, 42).normalize();
+    const introFrom = new THREE.Vector3(47, 32, 62);
+    // Land at a distance that actually frames the village for this aspect
+    // ratio, so portrait phones are not left staring at a sliver of it.
+    const introTo = introDir.clone().multiplyScalar(restingDistance());
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const INTRO_MS = 800;
+    let introActive = !reduceMotion;
+    if (reduceMotion) { camera.position.copy(introTo); controls.target.set(0, 2.2, 0); }
+    renderer.domElement.addEventListener('pointerdown', () => { introActive = false; }, { once:true });
+    addEventListener('keydown', () => { introActive = false; }, { once:true });
+
+    // 动画
+    const clock = new THREE.Clock();
+    const loader = document.querySelector('#loader');
+    let firstFrameDone = false;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      // rAF normally stops by itself when backgrounded, but guard anyway —
+      // drawing a hidden tab only drains battery on a phone.
+      if (document.hidden) return;
+      // getDelta() also advances clock.elapsedTime, so read it straight after.
+      const delta = Math.min(0.05, clock.getDelta());
+      const time = clock.elapsedTime;
+      const positions = particleGeometry.attributes.position.array;
+      const season = document.querySelector('#season').value;
+      const speed = season === 'winter' ? 1 : 0.5;
+
+      for (let i = 0; i < particleCount; i++) {
+        positions[i * 3 + 1] -= particleSpeeds[i] * speed;
+        positions[i * 3] += Math.sin(time * 0.45 + i) * 0.002;
+
+        if (positions[i * 3 + 1] < 0) {
+          positions[i * 3 + 1] = 28;
+          positions[i * 3] = (Math.random() - 0.5) * 65;
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 65;
+        }
+      }
+
+      particleGeometry.attributes.position.needsUpdate = true;
+      flame.scale.y = 0.92 + Math.sin(time * 12) * 0.08 + Math.random() * 0.04;
+      fireLight.intensity = 21 + Math.sin(time * 9) * 4 + Math.random() * 2;
+      // HOME lighting is intentionally constant: no flicker or pulse.
+
+      if (introActive) {
+        const t=Math.min(1,(performance.now()-introStart)/INTRO_MS);
+        const eased=1-Math.pow(1-t,3);
+        camera.position.lerpVectors(introFrom,introTo,eased);
+        controls.target.set(0,2.2,0);
+        if(t>=1) introActive=false;
+      }
+      const animalDelta=Math.min(0.05,Math.max(0,time-(animate.lastAnimalTime||time)));
+      animate.lastAnimalTime=time;
+      woodlandFriends.forEach(animal=>{
+        const d=animal.userData;
+        d.turnIn-=animalDelta;
+        if(d.pause>0) {
+          d.pause=Math.max(0,d.pause-animalDelta);
+        } else {
+          if(d.turnIn<=0) {
+            const current=Math.atan2(d.vx,d.vz);
+            const next=current+(Math.random()-.5)*2.5;
+            const newSpeed=.65+Math.random()*1.75;
+            d.vx=Math.sin(next)*newSpeed;
+            d.vz=Math.cos(next)*newSpeed;
+            d.turnIn=1.1+Math.random()*4.2;
+            if(Math.random()<.16) d.pause=.45+Math.random()*1.7;
+          }
+          animal.position.x+=d.vx*animalDelta;
+          animal.position.z+=d.vz*animalDelta;
+        }
+        // Keep the little friends roaming over the full village; turn them back at the edges.
+        const limit=31;
+        if(animal.position.x>limit || animal.position.x< -limit) {
+          d.vx=-d.vx; animal.position.x=Math.max(-limit,Math.min(limit,animal.position.x));
+          d.turnIn=.5+Math.random()*1.2;
+        }
+        if(animal.position.z>limit || animal.position.z< -limit) {
+          d.vz=-d.vz; animal.position.z=Math.max(-limit,Math.min(limit,animal.position.z));
+          d.turnIn=.5+Math.random()*1.2;
+        }
+        const moving=d.pause<=0;
+        animal.rotation.y=Math.atan2(d.vx,d.vz);
+        animal.position.y=moving?Math.abs(Math.sin(time*d.gait+d.phase))*d.bob:0;
+        d.legs.forEach((leg,index)=>{
+          leg.rotation.z=moving?Math.sin(time*d.gait+d.phase+(index%2)*Math.PI)*.24:0;
+        });
+      });
+      stepWalk(delta);
+      controls.update();
+      renderer.render(scene, camera);
+
+      // The veil only lifts once a real frame is on screen, so a slow mobile
+      // connection shows the branded loader instead of an empty dark canvas.
+      if (!firstFrameDone) {
+        firstFrameDone = true;
+        loader.classList.add('hidden');
+        loader.style.visibility = 'hidden';
+      }
+    }
+
+    animate();
+
+    function handleResize() {
+      applyAspectFov();   // recomputes the aspect AND the portrait FOV bump
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, IS_TOUCH ? 1.15 : 1.5));
+      onInputCapabilityChange();  // rotating can change the pointer capability
+    }
+    addEventListener('resize', handleResize);
+    // orientationchange fires before the viewport has actually settled.
+    addEventListener('orientationchange', () => setTimeout(handleResize, 150));
+    // Catches the mobile URL bar hiding/showing, which window resize can miss.
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', handleResize);
+  </script>
+</body>
+</html>
