@@ -42,6 +42,19 @@
       font-weight:500; letter-spacing:.09em; }
     .brand p { margin:7px 0 0; color:#ead9c2; font-size:10px; letter-spacing:.22em; text-transform:uppercase; }
     .brand-mark { display:inline-block; color:#e3b879; margin-right:8px; }
+    /* Three editable marquee lines beneath the brand title. */
+    .village-ticker { position:fixed; z-index:3; left:28px; top:82px; width:min(420px,calc(100vw - 56px));
+      pointer-events:none; overflow:hidden; -webkit-mask-image:linear-gradient(90deg,#000 0%,#000 88%,transparent 100%);
+      mask-image:linear-gradient(90deg,#000 0%,#000 88%,transparent 100%); }
+    .ticker-row { height:22px; overflow:hidden; border-top:1px solid rgba(239,218,187,.12); }
+    .ticker-row:last-child { border-bottom:1px solid rgba(239,218,187,.12); }
+    .ticker-track { display:flex; width:max-content; align-items:center; height:22px;
+      color:rgba(247,238,224,.78); font-size:10px; letter-spacing:.12em; white-space:nowrap;
+      animation:tickerScroll 18s linear infinite; }
+    .ticker-track span { display:inline-block; padding-right:48px; }
+    .ticker-row:nth-child(2) .ticker-track { animation-duration:22s; animation-direction:reverse; }
+    .ticker-row:nth-child(3) .ticker-track { animation-duration:26s; }
+    @keyframes tickerScroll { from { transform:translateX(0); } to { transform:translateX(-50%); } }
     .panel { position:fixed; z-index:14; width:min(340px,calc(100vw - 28px)); padding:18px;
       overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
       border:1px solid rgba(239,218,187,.26); border-radius:19px;
@@ -184,6 +197,9 @@
       .brand { top:calc(var(--pad) + var(--safe-t)); left:calc(var(--pad) + var(--safe-l)); }
       .brand h1 { font-size:clamp(17px,4.8vw,22px); }
       .brand p { font-size:8px; letter-spacing:.14em; }
+      .village-ticker { left:calc(var(--pad) + var(--safe-l)); top:calc(60px + var(--safe-t));
+        width:calc(100vw - 24px - var(--safe-l) - var(--safe-r)); }
+      .ticker-track { font-size:9px; }
       .help { display:none; }
 
       .settings-toggle { top:calc(10px + var(--safe-t)); right:calc(10px + var(--safe-r));
@@ -312,6 +328,17 @@
   <div class="brand">
     <h1><span class="brand-mark">✦</span>The Village</h1>
   </div>
+  <div class="village-ticker" aria-label="Village announcements">
+    <div class="ticker-row"><div class="ticker-track"><span>WELCOME TO THE VILLAGE · 欢迎来到村庄</span></div></div>
+    <div class="ticker-row"><div class="ticker-track"><span>EXPLORE THE COFFEE VANS · 探索咖啡小屋</span></div></div>
+    <div class="ticker-row"><div class="ticker-track"><span>GOOD COFFEE · KIND MOMENTS · 温暖时刻</span></div></div>
+  </div>
+  <script>
+    document.querySelectorAll('.ticker-track').forEach(function(track) {
+      var original = track.querySelector('span');
+      if (original) track.appendChild(original.cloneNode(true));
+    });
+  </script>
 
   <button class="settings-toggle" id="settingsToggle" type="button" aria-label="Open settings" aria-expanded="false" title="Settings" style="width:40px;height:40px;min-height:40px;">
     <span class="gear" aria-hidden="true" style="font-size:20px;">⚙</span>
@@ -420,9 +447,9 @@
     const HOME_PHOTO = 'assets/photos/home.jpg';
 
     const PLAYLIST = [
-      { title: 'Song 1', src: 'assets/music/song1.mp3' },
-      { title: 'Song 2', src: 'assets/music/song2.mp3' },
-      { title: 'Song 3', src: 'assets/music/song3.mp3' }
+      { title: '山间微风', src: 'assets/music/song1.mp3' },
+      { title: '炉火旁的夜晚', src: 'assets/music/song2.mp3' },
+      { title: '雪落无声', src: 'assets/music/song3.mp3' }
     ];
 
     // ============================================================
@@ -933,7 +960,7 @@
     // EASY EDIT ZONE — change words, links, and shop details here.
     // Replace each url with your own website. Use "#" to disable a link.
     // ============================================================
-    const HOME_URL = "https://makeawishcafe.com";
+    const HOME_URL = "https://example.com";
 
     // --- UI TEXT (change any words on screen here) ---
     const UI_TEXT = {
